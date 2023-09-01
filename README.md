@@ -17,7 +17,7 @@ The script `main.py` performs the following steps:
 The script can be used as follows:
 
 ```python
-from data_analysis_pipeline import AdvancedDataAnalysisPipeline
+from main import AdvancedDataAnalysisPipeline
 
 pipeline = AdvancedDataAnalysisPipeline("path_to_your_data.csv")
 
