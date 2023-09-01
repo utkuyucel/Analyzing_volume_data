@@ -2,16 +2,6 @@
 
 This repository contains a Python script that I have created to analyze the trading volume data of a cryptocurrency for my personal use. 
 
-## Description
-
-The script `main.py` performs the following steps:
-
-1. Load the trading volume data from a CSV file. The data should have at least two columns: a timestamp (`snapped_at`) and the corresponding trading volume (`volume`). 
-2. Plot the volume over time.
-3. Identify and remove outliers using the Interquartile Range (IQR) method.
-4. Plot the cleaned volume data over time.
-5. Analyze and visualize the average trading volume by day of the week, month, and whether it's a weekend or not.
-
 ## Usage
 
 The script can be used as follows:
