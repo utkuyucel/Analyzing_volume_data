@@ -1,3 +1,4 @@
+from __future__ import annotations
 import pandas as pd
 import numpy as np
 import logging
@@ -6,7 +7,6 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 from sklearn.ensemble import IsolationForest
-from __future__ import annotations
 from statsmodels.nonparametric.smoothers_lowess import lowess
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
