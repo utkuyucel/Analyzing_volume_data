@@ -130,33 +130,34 @@ class AdvancedDataAnalysisPipeline:
         fig.show()
 
     def perform_clustering(self):
-        volume_data = self.df[['volume']]
+        self.df['date_numeric'] = (self.df['date'] - self.df['date'].min()).dt.days
+        volume_data = self.df[['date_numeric', 'volume']]
         
-        # Step 1: Compute WCSS for multiple cluster numbers
-        # wcss = []
-        # for i in range(1, 11):
-        #     kmeans = KMeans(n_clusters=i, init='k-means++', random_state=42)
-        #     kmeans.fit(volume_data)
-        #     wcss.append(kmeans.inertia_)
-        
-        # # Step 2: Use the "elbow method" to find the optimal number of clusters
-        # differences = np.diff(wcss)
-        # second_diff = np.diff(differences)
-        # optimal_clusters = np.where(second_diff == max(second_diff))[0][0] + 2
-        
-        # Step 3: Perform clustering with the optimal cluster count
+
         optimal_clusters = 3
 
         kmeans = KMeans(n_clusters=optimal_clusters, init='k-means++', random_state=42)
         self.df['cluster'] = kmeans.fit_predict(volume_data)
         
-        # Step 4: Visualize the clusters
-        fig = go.Figure()
+         # Step 4: Visualize the clusters using Plotly
+        fig = px.scatter(self.df, x='date', y='volume', color='cluster', 
+                        title='Clusters of Volume', labels={'cluster': 'Cluster Number'})
+
+        # Drawing the convex hull for each cluster
         for i in range(optimal_clusters):
             cluster_data = self.df[self.df['cluster'] == i]
-            fig.add_trace(go.Scatter(x=cluster_data['date'], y=cluster_data['volume'], mode='markers', name=f'Cluster {i+1}'))
-        
-        fig.update_layout(title='Clusters of Volume', xaxis_title='Date', yaxis_title='Volume')
+            
+            if len(cluster_data) >= 3:  # Need at least 3 points to create a convex hull
+                hull = ConvexHull(cluster_data[['date_numeric', 'volume']])
+                
+                # Extracting the boundary points of the convex hull
+                hull_points = hull.vertices.tolist()
+                hull_points.append(hull_points[0])  # Close the loop
+                
+                fig.add_trace(
+                    px.line(cluster_data.iloc[hull_points], x='date', y='volume').data[0]
+                )
+
         fig.show()
 
         # Step 5: Cluster Analysis & Interpretation
@@ -188,4 +189,4 @@ class AdvancedDataAnalysisPipeline:
         self.perform_clustering()
 
 if __name__ == "__main__":
-    pipeline = AdvancedDataAnalysisPipeline("x-trading-volume-1-year.csv")
+    pipeline = AdvancedDataAnalysisPipeline("bitlo-trading-volume-1-year.csv")
