@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import logging
 from sklearn.ensemble import IsolationForest
+from __future__ import annotations
 import plotly.express as px
 from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
@@ -16,13 +17,24 @@ from plotly.subplots import make_subplots
 logging.basicConfig(level=logging.INFO)
 
 class AdvancedDataAnalysisPipeline:
-    def __init__(self, file_path):
+    """
+    An advanced data analysis pipeline for visualizing and analyzing trading volume data.
+
+    Attributes:
+    file_path (str): Path to the CSV file containing the trading volume data.
+    df (pd.DataFrame): DataFrame holding the trading volume data.
+    outliers (pd.DataFrame): DataFrame holding the identified outlier data points.
+    """
+
+    def __init__(self, file_path: str) -> None:
         self.file_path = file_path
-        self.df = None
-        self.outliers = None
+        self.df: pd.DataFrame = None
+        self.outliers: pd.DataFrame = None
         self.main()
 
-    def load_data(self):
+    def load_data(self) -> None:
+        """Load the trading volume data from the CSV file."""
+
         try:
             self.df = pd.read_csv(self.file_path)
             self.df["snapped_at"] = pd.to_datetime(self.df["snapped_at"])
@@ -35,7 +47,9 @@ class AdvancedDataAnalysisPipeline:
         except Exception as e:
             logging.error(f"Error loading data: {str(e)}")
 
-    def feature_engineering(self):
+    def feature_engineering(self) -> None:
+        """Perform feature engineering on the loaded data, like lag and rolling (moving) average."""
+
         try:
             # Introduce lag feature
             self.df['lag_volume'] = self.df['volume'].shift(1)
@@ -44,18 +58,29 @@ class AdvancedDataAnalysisPipeline:
         except Exception as e:
             logging.error(f"Error in feature engineering: {str(e)}")
 
-    def plot_data(self, title):
+    def plot_data(self, title: str) -> None:
+        """
+        Plot the trading volume data.
+
+        Args:
+        title (str): The title of the plot.
+        """
+
         fig = px.line(self.df, x='date', y='volume', title=title)
         fig.show()
 
-    def detect_outliers(self):
+    def detect_outliers(self) -> None:
+        """Detect and remove outliers in the trading volume data using Isolation Forest."""
+      
         iso = IsolationForest(contamination=0.05)
         self.df['outlier'] = iso.fit_predict(self.df[['volume']].values)
         self.outliers = self.df[self.df['outlier'] == -1]
         self.df = self.df[self.df['outlier'] != -1]
         logging.info(f"Identified and removed {len(self.outliers)} outliers.")
     
-    def heatmap_volume(self):
+    def heatmap_volume(self) -> None:
+        """Generate a heatmap visualizing average volume by day and month."""
+
         try:
             heatmap_data = self.df.groupby(['day_name', 'month'])['volume'].mean().unstack()
             days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -65,14 +90,18 @@ class AdvancedDataAnalysisPipeline:
         except Exception as e:
             logging.error(f"Error in heatmap volume: {str(e)}")
 
-    def plot_trend(self):
+    def plot_trend(self) -> None:
+        """Plot the trading volume along with its trend over time."""
+      
         # Using lowess to smooth the curve
         smoothed = lowess(self.df['volume'], np.arange(len(self.df['volume'])), frac=0.1)
         self.df['trend'] = smoothed[:, 1]
         fig = px.line(self.df, x='date', y=['volume', 'trend'], title='Volume with Trend over Time')
         fig.show()
 
-    def plot_volume_distribution(self):
+    def plot_volume_distribution(self) -> None:
+        """Plot the distribution of trading volumes with percentiles and statistics."""
+
         # Compute mean, median, and percentiles
         mean_volume = self.df["volume"].mean()
         median_volume = self.df["volume"].median()
@@ -104,11 +133,16 @@ class AdvancedDataAnalysisPipeline:
 
         fig.show()
 
-    def _set_day_order(self):
+    def _set_day_order(self) -> None:
+        """Set the order of days for plotting purposes."""
+
         day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
         self.df['day_name'] = pd.Categorical(self.df['day_name'], categories=day_order, ordered=True)
 
-    def _set_month_order(self):
+    def _set_month_order(self) -> None:
+        """Set the order of months for plotting purposes."""
+
+
         month_order = ['January', 'February', 'March', 'April',
                       'May', 'June', 'July', 'August',
                       'September', 'October', 'November', 'December']
@@ -117,33 +151,43 @@ class AdvancedDataAnalysisPipeline:
         self.df['month_name'] = pd.Categorical(self.df['month_name'], categories=month_order, ordered=True)
 
 
-    def plot_daywise_distribution(self):
+    def plot_daywise_distribution(self) -> None:
+        """Plot the distribution of trading volumes for each day of the week."""
+      
         self._set_day_order()
         fig = px.box(self.df, x='day_name', y='volume', title='Volume Distribution by Day of Week', points="all")
         fig.update_xaxes(categoryorder='array', categoryarray=['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])
         fig.show()
 
-    def plot_daywise_summary(self):
+    def plot_daywise_summary(self) -> None:
+        """Plot the summary of average trading volumes for each day of the week."""
+
         self._set_day_order()
         daywise_volume = self.df.groupby('day_name')['volume'].mean().reset_index()
         fig = px.bar(daywise_volume, x='day_name', y='volume', title='Daywise Trading Volume Summary')
         fig.update_xaxes(categoryorder='array', categoryarray=['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])
         fig.show()
 
-    def plot_monthwise_distribution(self):
+    def plot_monthwise_distribution(self) -> None:
+        """Plot the distribution of trading volumes for each month."""
+
         self._set_month_order()
         fig = px.box(self.df, x='month_name', y='volume', title='Volume Distribution by Month', points="all")
         fig.update_xaxes(categoryorder='array', categoryarray=['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'])
         fig.show()
 
-    def plot_monthwise_summary(self):
+    def plot_monthwise_summary(self) -> None:
+        """Plot the summary of average trading volumes for each month."""
+
         self._set_month_order()
         monthly_volume = self.df.groupby('month_name')['volume'].mean().reset_index()
         fig = px.bar(monthly_volume, x='month_name', y='volume', title='Monthly Trading Volume Summary')
         fig.update_xaxes(categoryorder='array', categoryarray=['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'])
         fig.show()
 
-    def perform_clustering(self):
+    def perform_clustering(self) -> None:
+        """Perform clustering on the trading volume data and visualize the results."""
+
         self.df['date_numeric'] = (self.df['date'] - self.df['date'].min()).dt.days
         volume_data = self.df[['date_numeric', 'volume']]
         
@@ -200,7 +244,9 @@ class AdvancedDataAnalysisPipeline:
         fig_monthwise.show()
 
 
-    def main(self):
+    def main(self) -> None:
+        """Main execution flow of the pipeline."""
+
         self.load_data()
         self.feature_engineering()
         self.plot_data('Volume over Time')
