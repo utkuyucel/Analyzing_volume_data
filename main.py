@@ -11,6 +11,7 @@ from statsmodels.nonparametric.smoothers_lowess import lowess
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from plotly.subplots import make_subplots
+from scipy.spatial import ConvexHull
 
 logging.basicConfig(level=logging.INFO)
 
