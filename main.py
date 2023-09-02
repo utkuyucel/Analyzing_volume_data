@@ -104,6 +104,21 @@ class AdvancedDataAnalysisPipeline:
 
         fig.show()
 
+    def plot_daywise_summary(self):
+        # Define day names for order and interpretability
+        day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        
+        # Convert the 'day_name' column to a categorical type with the specified order
+        self.df['day_name'] = pd.Categorical(self.df['day_name'], categories=day_order, ordered=True)
+        
+        # Calculate average volume per day
+        daywise_volume = self.df.groupby('day_name')['volume'].mean().reset_index()
+        
+        # Plot bar chart for each day
+        fig = px.bar(daywise_volume, x='day_name', y='volume', title='Daywise Trading Volume Summary')
+        fig.show()
+
+
 
     def plot_daywise_distribution(self):
         # Specify the order of days
@@ -114,6 +129,21 @@ class AdvancedDataAnalysisPipeline:
         fig = px.box(self.df, x='day_name', y='volume', title='Volume Distribution by Day of Week', points="all")
         fig.show()
 
+    def plot_monthwise_distribution(self):
+        # Define month names for order and interpretability
+        month_order = ['January', 'February', 'March', 'April',
+                       'May', 'June', 'July', 'August',
+                       'September', 'October', 'November', 'December']
+        month_name_map = dict(enumerate(month_order, 1))
+        
+        self.df['month_name'] = self.df['month'].map(month_name_map)
+        
+        # Convert the 'month_name' column to a categorical type with the specified order
+        self.df['month_name'] = pd.Categorical(self.df['month_name'], categories=month_order, ordered=True)
+
+        # Plot boxplot for each month
+        fig = px.box(self.df, x='month_name', y='volume', title='Volume Distribution by Month', points="all")
+        fig.show()
 
 
     def plot_monthwise_summary(self):
@@ -194,8 +224,10 @@ class AdvancedDataAnalysisPipeline:
         self.plot_data('Volume over Time (After Removing Outliers)')
         self.plot_trend()
         self.plot_volume_distribution()
+        self.plot_daywise_summary()
         self.plot_daywise_distribution()
         self.plot_monthwise_summary()
+        self.plot_monthwise_distribution()
         self.heatmap_volume()
         self.perform_clustering()
 
