@@ -104,59 +104,43 @@ class AdvancedDataAnalysisPipeline:
 
         fig.show()
 
-    def plot_daywise_summary(self):
-        # Define day names for order and interpretability
+    def _set_day_order(self):
         day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        
-        # Convert the 'day_name' column to a categorical type with the specified order
         self.df['day_name'] = pd.Categorical(self.df['day_name'], categories=day_order, ordered=True)
-        
-        # Calculate average volume per day
-        daywise_volume = self.df.groupby('day_name')['volume'].mean().reset_index()
-        
-        # Plot bar chart for each day
-        fig = px.bar(daywise_volume, x='day_name', y='volume', title='Daywise Trading Volume Summary')
-        fig.show()
 
+    def _set_month_order(self):
+        month_order = ['January', 'February', 'March', 'April',
+                      'May', 'June', 'July', 'August',
+                      'September', 'October', 'November', 'December']
+        month_name_map = dict(enumerate(month_order, 1))
+        self.df['month_name'] = self.df['month'].map(month_name_map)
+        self.df['month_name'] = pd.Categorical(self.df['month_name'], categories=month_order, ordered=True)
 
 
     def plot_daywise_distribution(self):
-        # Specify the order of days
-        days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        self.df['day_name'] = pd.Categorical(self.df['day_name'], categories=days_order, ordered=True)
-        
-        # Plot boxplot
+        self._set_day_order()
         fig = px.box(self.df, x='day_name', y='volume', title='Volume Distribution by Day of Week', points="all")
+        fig.update_xaxes(categoryorder='array', categoryarray=['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])
+        fig.show()
+
+    def plot_daywise_summary(self):
+        self._set_day_order()
+        daywise_volume = self.df.groupby('day_name')['volume'].mean().reset_index()
+        fig = px.bar(daywise_volume, x='day_name', y='volume', title='Daywise Trading Volume Summary')
+        fig.update_xaxes(categoryorder='array', categoryarray=['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])
         fig.show()
 
     def plot_monthwise_distribution(self):
-        # Define month names for order and interpretability
-        month_order = ['January', 'February', 'March', 'April',
-                       'May', 'June', 'July', 'August',
-                       'September', 'October', 'November', 'December']
-        month_name_map = dict(enumerate(month_order, 1))
-        
-        self.df['month_name'] = self.df['month'].map(month_name_map)
-        
-        # Convert the 'month_name' column to a categorical type with the specified order
-        self.df['month_name'] = pd.Categorical(self.df['month_name'], categories=month_order, ordered=True)
-
-        # Plot boxplot for each month
+        self._set_month_order()
         fig = px.box(self.df, x='month_name', y='volume', title='Volume Distribution by Month', points="all")
+        fig.update_xaxes(categoryorder='array', categoryarray=['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'])
         fig.show()
 
-
     def plot_monthwise_summary(self):
-        # Adding month names
-        month_name_map = {
-            1: 'January', 2: 'February', 3: 'March', 4: 'April',
-            5: 'May', 6: 'June', 7: 'July', 8: 'August',
-            9: 'September', 10: 'October', 11: 'November', 12: 'December'
-        }
-
-        monthly_volume = self.df.groupby('month')['volume'].mean().reset_index()
-        monthly_volume['month_name'] = monthly_volume['month'].map(month_name_map)
+        self._set_month_order()
+        monthly_volume = self.df.groupby('month_name')['volume'].mean().reset_index()
         fig = px.bar(monthly_volume, x='month_name', y='volume', title='Monthly Trading Volume Summary')
+        fig.update_xaxes(categoryorder='array', categoryarray=['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'])
         fig.show()
 
     def perform_clustering(self):
