@@ -47,17 +47,6 @@ class AdvancedDataAnalysisPipeline:
         except Exception as e:
             logging.error(f"Error loading data: {str(e)}")
 
-    def feature_engineering(self) -> None:
-        """Perform feature engineering on the loaded data, like lag and rolling (moving) average."""
-
-        try:
-            # Introduce lag feature
-            self.df['lag_volume'] = self.df['volume'].shift(1)
-            # Rolling window feature: 7-day rolling average
-            self.df['rolling_avg'] = self.df['volume'].rolling(window=7).mean()
-        except Exception as e:
-            logging.error(f"Error in feature engineering: {str(e)}")
-
     def plot_data(self, title: str) -> None:
         """
         Plot the trading volume data.
@@ -248,7 +237,6 @@ class AdvancedDataAnalysisPipeline:
         """Main execution flow of the pipeline."""
 
         self.load_data()
-        self.feature_engineering()
         self.plot_data('Volume over Time')
         self.detect_outliers()
         self.plot_data('Volume over Time (After Removing Outliers)')
