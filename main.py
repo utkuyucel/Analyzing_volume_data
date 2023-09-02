@@ -133,45 +133,56 @@ class AdvancedDataAnalysisPipeline:
         self.df['date_numeric'] = (self.df['date'] - self.df['date'].min()).dt.days
         volume_data = self.df[['date_numeric', 'volume']]
         
-
         optimal_clusters = 3
 
         kmeans = KMeans(n_clusters=optimal_clusters, init='k-means++', random_state=42)
         self.df['cluster'] = kmeans.fit_predict(volume_data)
         
-         # Step 4: Visualize the clusters using Plotly
-        fig = px.scatter(self.df, x='date', y='volume', color='cluster', 
-                        title='Clusters of Volume', labels={'cluster': 'Cluster Number'})
+        # Custom color map for clusters
+        cluster_colors = {0: 'red', 1: 'blue', 2: 'green'}
+        
+        # Create an empty figure
+        fig = go.Figure()
 
-        # Drawing the convex hull for each cluster
+        # Add a scatter plot for each cluster with its respective color
         for i in range(optimal_clusters):
             cluster_data = self.df[self.df['cluster'] == i]
+            fig.add_trace(
+                go.Scatter(x=cluster_data['date'], y=cluster_data['volume'], 
+                          mode='markers', name=f'Cluster {i}', 
+                          marker=dict(color=cluster_colors[i]))
+            )
             
             if len(cluster_data) >= 3:  # Need at least 3 points to create a convex hull
                 hull = ConvexHull(cluster_data[['date_numeric', 'volume']])
-                
-                # Extracting the boundary points of the convex hull
                 hull_points = hull.vertices.tolist()
                 hull_points.append(hull_points[0])  # Close the loop
-                
                 fig.add_trace(
-                    px.line(cluster_data.iloc[hull_points], x='date', y='volume').data[0]
+                    go.Scatter(x=cluster_data.iloc[hull_points]['date'], y=cluster_data.iloc[hull_points]['volume'], 
+                              mode='lines', showlegend=False, 
+                              line=dict(color=cluster_colors[i]))
                 )
 
+        fig.update_layout(title='Clusters of Volume', xaxis_title='Date', yaxis_title='Volume')
         fig.show()
 
-        # Step 5: Cluster Analysis & Interpretation
         # Descriptive statistics for each cluster
         cluster_summaries = self.df.groupby('cluster')['volume'].agg(['mean', 'median', 'std', 'count'])
         
         # Daywise distribution of clusters
         daywise_clusters = self.df.groupby(['day_name', 'cluster']).size().unstack().fillna(0)
         fig_daywise = px.bar(daywise_clusters, title='Daywise Distribution of Clusters', labels={'value': 'Count'})
+        # Apply custom colors for bar chart
+        for i, color in cluster_colors.items():
+            fig_daywise.update_traces(selector=dict(name=str(i)), marker_color=color)
         fig_daywise.show()
         
         # Monthwise distribution of clusters
         monthwise_clusters = self.df.groupby(['month', 'cluster']).size().unstack().fillna(0)
         fig_monthwise = px.bar(monthwise_clusters, title='Monthwise Distribution of Clusters', labels={'value': 'Count'})
+        # Apply custom colors for bar chart
+        for i, color in cluster_colors.items():
+            fig_monthwise.update_traces(selector=dict(name=str(i)), marker_color=color)
         fig_monthwise.show()
 
 
