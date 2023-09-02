@@ -1,17 +1,15 @@
 import pandas as pd
 import numpy as np
 import logging
-from sklearn.ensemble import IsolationForest
-from __future__ import annotations
 import plotly.express as px
-from statsmodels.tsa.seasonal import seasonal_decompose
-from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
-from statsmodels.nonparametric.smoothers_lowess import lowess
-from sklearn.preprocessing import StandardScaler
-from sklearn.cluster import KMeans
 import seaborn as sns
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
+from sklearn.ensemble import IsolationForest
+from __future__ import annotations
+from statsmodels.nonparametric.smoothers_lowess import lowess
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
 from plotly.subplots import make_subplots
 
 logging.basicConfig(level=logging.INFO)
