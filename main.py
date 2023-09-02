@@ -100,17 +100,14 @@ class AdvancedDataAnalysisPipeline:
                           nbins=50, 
                           title='Volume Distribution',
                           color="is_weekend",
-                          marginal="violin", # can also use 'box', 'rug'
-                          hover_data=self.df.columns) # displays all columns when hovering over a bar
+                          marginal="violin", 
+                          hover_data=self.df.columns) 
         
-        # Add vertical lines for mean and median
         fig.add_vline(x=mean_volume, line_dash="dash", line_color="blue", name="Mean")
         fig.add_vline(x=median_volume, line_dash="dash", line_color="green", name="Median")
         
-        # Shade potential outliers
+        # Shading Outliers
         fig.add_vrect(x0=p_05, x1=p_95, fillcolor='rgba(0,0,0,0)', line=dict(color="red", dash="dash"), name="5th-95th Percentile")
-
-
 
         # Annotations for mean, median, and percentiles
         fig.add_annotation(x=mean_volume, y=0.9, yref='paper', text="Mean", showarrow=False)
@@ -183,13 +180,13 @@ class AdvancedDataAnalysisPipeline:
         kmeans = KMeans(n_clusters=optimal_clusters, init='k-means++', random_state=42)
         self.df['cluster'] = kmeans.fit_predict(volume_data)
         
-        # Custom color map for clusters
+        # Custom color map for clusters (Every cluster must be different color in a plot but each one must be same color in the whole analysis process.)
         cluster_colors = {0: 'red', 1: 'blue', 2: 'green'}
         
         # Create an empty figure
         fig = go.Figure()
 
-        # Add a scatter plot for each cluster with its respective color
+        # Add a scatter plot for each cluster with its color
         for i in range(optimal_clusters):
             cluster_data = self.df[self.df['cluster'] == i]
             fig.add_trace(
@@ -198,10 +195,10 @@ class AdvancedDataAnalysisPipeline:
                           marker=dict(color=cluster_colors[i]))
             )
             
-            if len(cluster_data) >= 3:  # Need at least 3 points to create a convex hull
+            if len(cluster_data) >= 3:  # Convex Hull -> Minimum 3 points
                 hull = ConvexHull(cluster_data[['date_numeric', 'volume']])
                 hull_points = hull.vertices.tolist()
-                hull_points.append(hull_points[0])  # Close the loop
+                hull_points.append(hull_points[0])  
                 fig.add_trace(
                     go.Scatter(x=cluster_data.iloc[hull_points]['date'], y=cluster_data.iloc[hull_points]['volume'], 
                               mode='lines', showlegend=False, 
@@ -211,13 +208,13 @@ class AdvancedDataAnalysisPipeline:
         fig.update_layout(title='Clusters of Volume', xaxis_title='Date', yaxis_title='Volume')
         fig.show()
 
-        # Descriptive statistics for each cluster
         cluster_summaries = self.df.groupby('cluster')['volume'].agg(['mean', 'median', 'std', 'count'])
         
         # Daywise distribution of clusters
         daywise_clusters = self.df.groupby(['day_name', 'cluster']).size().unstack().fillna(0)
         fig_daywise = px.bar(daywise_clusters, title='Daywise Distribution of Clusters', labels={'value': 'Count'})
-        # Apply custom colors for bar chart
+
+        # Applying colors
         for i, color in cluster_colors.items():
             fig_daywise.update_traces(selector=dict(name=str(i)), marker_color=color)
         fig_daywise.show()
@@ -225,7 +222,8 @@ class AdvancedDataAnalysisPipeline:
         # Monthwise distribution of clusters
         monthwise_clusters = self.df.groupby(['month', 'cluster']).size().unstack().fillna(0)
         fig_monthwise = px.bar(monthwise_clusters, title='Monthwise Distribution of Clusters', labels={'value': 'Count'})
-        # Apply custom colors for bar chart
+        
+        # Apply colors
         for i, color in cluster_colors.items():
             fig_monthwise.update_traces(selector=dict(name=str(i)), marker_color=color)
         fig_monthwise.show()
