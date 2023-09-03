@@ -2,7 +2,6 @@ from __future__ import annotations
 import pandas as pd
 import numpy as np
 import logging
-import requests
 import plotly.express as px
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -45,7 +44,7 @@ class AdvancedDataAnalysisPipeline:
         data = response.json()["volumes"]
 
         # Transforming timestamps into dates
-        processed_data = [(_timestamp_to_date(item[0]), item[1].split(".")[0]) for item in data]
+        processed_data = [(self._timestamp_to_date(item[0]), item[1].split(".")[0]) for item in data]
 
         output_data = pd.DataFrame(processed_data, columns = ["snapped_at", "volume"])
         return output_data
