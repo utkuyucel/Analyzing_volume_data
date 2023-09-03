@@ -12,6 +12,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from plotly.subplots import make_subplots
 from scipy.spatial import ConvexHull
+from datetime import datetime
 
 logging.basicConfig(level=logging.INFO)
 
@@ -25,17 +26,42 @@ class AdvancedDataAnalysisPipeline:
     outliers (pd.DataFrame): DataFrame holding the identified outlier data points.
     """
 
-    def __init__(self, file_path: str) -> None:
-        self.file_path = file_path
+    def __init__(self, endpoint: str) -> None:
+        self.endpoint = endpoint
         self.df: pd.DataFrame = None
         self.outliers: pd.DataFrame = None
         self.main()
+
+    def get_data_from_api(self):
+        # API data with timestamps and volumes
+        url = self.endpoint
+        
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+
+        response = requests.get(url, headers=headers)
+        data = response.json()["volumes"]
+
+        # Transforming timestamps into dates
+        processed_data = [(_timestamp_to_date(item[0]), item[1].split(".")[0]) for item in data]
+
+        output_data = pd.DataFrame(processed_data, columns = ["snapped_at", "volume"])
+        return output_data
+        
+    def _timestamp_to_date(self, timestamp):
+        # Convert milliseconds to seconds
+        timestamp_in_seconds = timestamp / 1000
+        dt_object = datetime.utcfromtimestamp(timestamp_in_seconds)
+        date_str = dt_object.strftime("%Y-%m-%d")
+        return date_str
+
 
     def load_data(self) -> None:
         """Load the trading volume data from the CSV file."""
 
         try:
-            self.df = pd.read_csv(self.file_path)
+            self.df = self.get_data_from_api()
             self.df["snapped_at"] = pd.to_datetime(self.df["snapped_at"])
             self.df["volume"] = self.df["volume"].astype(int)
             self.df["date"] = self.df["snapped_at"].dt.date
@@ -247,4 +273,4 @@ class AdvancedDataAnalysisPipeline:
         self.perform_clustering()
 
 if __name__ == "__main__":
-    pipeline = AdvancedDataAnalysisPipeline("bitlo-trading-volume-1-year.csv")
+    pipeline = AdvancedDataAnalysisPipeline("https://www.coingecko.com/exchanges/968/usd/1_year.json?locale=en")
