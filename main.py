@@ -296,7 +296,7 @@ if __name__ == "__main__":
   ENDPOINT = "https://www.coingecko.com/exchanges/968/usd/1_year.json?locale=en"
   raw_data = DataExtractor().get_raw_data_from_api(ENDPOINT)
   transformed_data = DataTransformer(raw_data).transform()
-  loader = DataLoader(transformed_data).save_to_csv("raw_data")
+  loader = DataLoader(transformed_data).save_to_csv("raw_data.csv")
   analyzer = DataAnalyzer(transformed_data)
   analyzer.perform_eda()
-  analyzer.save_to_csv("analzyed_data.csv")
+  analyzer.save_to_csv("analyzed.csv")
