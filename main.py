@@ -59,7 +59,7 @@ class AdvancedDataAnalysisPipeline:
         return date_str
 
 
-    def load_data(self) -> None:
+    def extract_data(self) -> None:
         """Load the trading volume data from the CSV file."""
 
         try:
@@ -264,7 +264,7 @@ class AdvancedDataAnalysisPipeline:
     def main(self) -> None:
         """Main execution flow of the pipeline."""
 
-        self.load_data()
+        self.extract_data()
         self.plot_data('Volume over Time')
         self.detect_outliers()
         self.plot_data('Volume over Time (After Removing Outliers)')
