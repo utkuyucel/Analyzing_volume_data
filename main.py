@@ -47,6 +47,8 @@ class AdvancedDataAnalysisPipeline:
         processed_data = [(self._timestamp_to_date(item[0]), item[1].split(".")[0]) for item in data]
 
         output_data = pd.DataFrame(processed_data, columns = ["snapped_at", "volume"])
+        logging.info(f"Data has extracted.")
+
         return output_data
         
     def _timestamp_to_date(self, timestamp):
@@ -255,6 +257,9 @@ class AdvancedDataAnalysisPipeline:
             fig_monthwise.update_traces(selector=dict(name=str(i)), marker_color=color)
         fig_monthwise.show()
 
+    def save_dataframe(self) -> None:
+      self.df.to_csv("dataframe.csv")
+
 
     def main(self) -> None:
         """Main execution flow of the pipeline."""
@@ -271,6 +276,7 @@ class AdvancedDataAnalysisPipeline:
         self.plot_monthwise_distribution()
         self.heatmap_volume()
         self.perform_clustering()
+        self.save_dataframe()
 
 if __name__ == "__main__":
     pipeline = AdvancedDataAnalysisPipeline("https://www.coingecko.com/exchanges/968/usd/1_year.json?locale=en")
