@@ -32,7 +32,7 @@ class AdvancedDataAnalysisPipeline:
         self.outliers: pd.DataFrame = None
         self.main()
 
-    def get_data_from_api(self):
+    def get_data_from_api(self) -> pd.DataFrame:
         # API data with timestamps and volumes
         url = self.endpoint
         
@@ -51,7 +51,7 @@ class AdvancedDataAnalysisPipeline:
 
         return output_data
         
-    def _timestamp_to_date(self, timestamp):
+    def _timestamp_to_date(self, timestamp) -> dt.Datetime:
         # Convert milliseconds to seconds
         timestamp_in_seconds = timestamp / 1000
         dt_object = datetime.utcfromtimestamp(timestamp_in_seconds)
