@@ -2,6 +2,7 @@ from __future__ import annotations
 import pandas as pd
 import numpy as np
 import logging
+import requests
 import plotly.express as px
 import seaborn as sns
 import matplotlib.pyplot as plt
