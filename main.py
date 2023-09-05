@@ -259,20 +259,46 @@ class DataAnalyzer:
     
     # Daywise distribution of clusters
     daywise_clusters = self.df.groupby(['day_name', 'cluster']).size().unstack().fillna(0)
-    fig_daywise = px.bar(daywise_clusters, title='Daywise Distribution of Clusters', labels={'value': 'Count'})
+    daywise_total = daywise_clusters.sum(axis=1)
+    daywise_percentage = (daywise_clusters.divide(daywise_total, axis=0) * 100).round(2).astype(str) + '%'
 
-    # Applying colors
-    for i, color in cluster_colors.items():
-        fig_daywise.update_traces(selector=dict(name=str(i)), marker_color=color)
+    fig_daywise = go.Figure()
+    for i in range(optimal_clusters):
+        y_cumulative = daywise_clusters.iloc[:, :i].sum(axis=1)  # cumulative height up to the cluster of interest
+        fig_daywise.add_trace(
+            go.Bar(
+                x=daywise_clusters.index, 
+                y=daywise_clusters[i],
+                name=f'Cluster {i}',
+                marker_color=cluster_colors[i],
+                text=daywise_percentage[i],
+                textposition='inside',
+                insidetextanchor='middle',
+            )
+        )
+    fig_daywise.update_layout(title='Daywise Distribution of Clusters', xaxis_title='Day', yaxis_title='Count')
     fig_daywise.show()
-    
+
     # Monthwise distribution of clusters
     monthwise_clusters = self.df.groupby(['month', 'cluster']).size().unstack().fillna(0)
-    fig_monthwise = px.bar(monthwise_clusters, title='Monthwise Distribution of Clusters', labels={'value': 'Count'})
-    
-    # Apply colors
-    for i, color in cluster_colors.items():
-        fig_monthwise.update_traces(selector=dict(name=str(i)), marker_color=color)
+    monthwise_total = monthwise_clusters.sum(axis=1)
+    monthwise_percentage = (monthwise_clusters.divide(monthwise_total, axis=0) * 100).round(2).astype(str) + '%'
+
+    fig_monthwise = go.Figure()
+    for i in range(optimal_clusters):
+        y_cumulative = monthwise_clusters.iloc[:, :i].sum(axis=1)
+        fig_monthwise.add_trace(
+            go.Bar(
+                x=monthwise_clusters.index, 
+                y=monthwise_clusters[i],
+                name=f'Cluster {i}',
+                marker_color=cluster_colors[i],
+                text=monthwise_percentage[i],
+                textposition='inside',
+                insidetextanchor='middle',
+            )
+        )
+    fig_monthwise.update_layout(title='Monthwise Distribution of Clusters', xaxis_title='Month', yaxis_title='Count')
     fig_monthwise.show()
   
   def plot_weekday_vs_weekend_monthly_averages(self) -> None:
