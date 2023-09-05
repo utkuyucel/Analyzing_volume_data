@@ -111,17 +111,43 @@ class DataAnalyzer:
     fig.show()
 
   def heatmap_volume(self) -> None:
-    """Generate a heatmap visualizing average volume by day and month."""
+      """Generate a heatmap visualizing average volume by day and month."""
 
-    try:
       heatmap_data = self.df.groupby(['day_name', 'month'])['volume'].mean().unstack()
       days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
       heatmap_data = heatmap_data.reindex(days_order)
-      fig = px.imshow(heatmap_data, title='Average Volume by Day and Month')
+      
+      # Create the heatmap with annotations
+      fig = go.Figure(go.Heatmap(
+          z=heatmap_data.values,
+          x=heatmap_data.columns,
+          y=heatmap_data.index,
+          colorscale='Viridis',
+          hoverongaps=False,
+          hoverinfo='z',
+          zauto=False,
+          zmax=heatmap_data.values.max(),
+          zmin=heatmap_data.values.min(),
+          showscale=True
+      ))
+
+      # Add annotations with a '$' symbol at the end
+      for i, row in enumerate(heatmap_data.values):
+          for j, value in enumerate(row):
+              fig.add_annotation(go.layout.Annotation(
+                  text=f"{round(value, 2)}$", 
+                  x=heatmap_data.columns[j], 
+                  y=days_order[i], 
+                  xref='x1', 
+                  yref='y1', 
+                  showarrow=False,
+                  font=dict(color="white" if value > (heatmap_data.values.max() / 2) else "black")
+              ))
+      
+      fig.update_layout(title='Average Volume by Day and Month', xaxis=dict(title='Month'), yaxis=dict(title='Day'))
       fig.show()
-    except Exception as e:
-      logging.error(f"Error in heatmap volume: {str(e)}")
-  
+
+    
   def plot_trend(self) -> None:
     """Plot the trading volume along with its trend over time."""
   
