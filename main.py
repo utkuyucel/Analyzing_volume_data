@@ -274,6 +274,40 @@ class DataAnalyzer:
     for i, color in cluster_colors.items():
         fig_monthwise.update_traces(selector=dict(name=str(i)), marker_color=color)
     fig_monthwise.show()
+  
+  def plot_weekday_vs_weekend_monthly_averages(self) -> None:
+      """Plot the average trading volumes for weekdays vs weekends for each month with percentage annotations."""
+      
+      # Determine if it's a weekend
+      self.df['is_weekend'] = self.df['day_name'].isin(['Saturday', 'Sunday'])
+      
+      # Calculate monthly average trading volume
+      monthly_averages = self.df.groupby(['month', 'is_weekend'])['volume'].mean().reset_index()
+      
+      # Add month names
+      month_order = ['January', 'February', 'March', 'April', 'May', 'June', 
+                    'July', 'August', 'September', 'October', 'November', 'December']
+      month_name_map = dict(enumerate(month_order, 1))
+      monthly_averages['month_name'] = monthly_averages['month'].map(month_name_map)
+      
+      # Calculate percentage values
+      total_volumes = monthly_averages.groupby('month_name')['volume'].sum()
+      monthly_averages['percentage'] = monthly_averages.apply(lambda row: (row['volume'] / total_volumes[row['month_name']]) * 100, axis=1)
+      monthly_averages['text'] = monthly_averages['percentage'].round(2).astype(str) + '%'
+      
+      # Visualize the averages
+      fig = px.bar(monthly_averages, 
+                  x='month_name', 
+                  y='volume', 
+                  color='is_weekend',
+                  title='Average Trading Volume by Month (Weekday vs Weekend)',
+                  labels={'is_weekend': 'Is Weekend?', 'volume': 'Average Volume'},
+                  text='text'  # Add the percentage values
+                  )
+      fig.update_xaxes(categoryorder='array', categoryarray=month_order)
+      fig.update_traces(textposition='inside')
+      fig.show()
+
 
 
   def perform_eda(self) -> None:
@@ -283,6 +317,7 @@ class DataAnalyzer:
     self.plot_daywise_summary()
     self.plot_daywise_distribution()
     self.plot_monthwise_summary()
+    self.plot_weekday_vs_weekend_monthly_averages()
     self.plot_monthwise_distribution()
     self.heatmap_volume()
     self.perform_clustering()
