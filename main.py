@@ -24,7 +24,7 @@ class DataExtractor:
     self.raw_data = None
 
 
-  def get_raw_data_from_api(self, endpoint: str) -> pd.DataFrame:
+  def get_raw_data_from_coingecko(self, endpoint: str) -> pd.DataFrame:
     # API data with timestamps and volumes
     self.endpoint = endpoint
 
@@ -45,7 +45,7 @@ class DataTransformer:
     self.df = data
     self.outliers = None
 
-  def transform_timestamps_from_api(self):
+  def transform_timestamps_from_coingecko(self):
     # Transforming timestamps into dates
     processed_data = [(self._timestamp_to_date(item[0]), item[1].split(".")[0]) for item in self.df]
     self.df = pd.DataFrame(processed_data, columns = ["snapped_at", "volume"])
@@ -97,7 +97,7 @@ class DataTransformer:
     logging.info(f"Identified and removed {len(self.outliers)} outliers.")
 
   def transform(self) -> None:
-    self.transform_timestamps_from_api()
+    self.transform_timestamps_from_coingecko()
     self.extract_data()
     self.detect_outliers()
     return self.df
@@ -431,7 +431,7 @@ class DataValidator:
 
 if __name__ == "__main__":
   ENDPOINT = "https://www.coingecko.com/exchanges/968/usd/1_year.json?locale=en"
-  raw_data = DataExtractor().get_raw_data_from_api(ENDPOINT)
+  raw_data = DataExtractor().get_raw_data_from_coingecko(ENDPOINT)
 
   data_validator = DataValidator(raw_data)
   if not data_validator.validate():
