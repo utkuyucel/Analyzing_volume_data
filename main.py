@@ -59,7 +59,7 @@ class DataTransformer:
     date_str = dt_object.strftime("%Y-%m-%d")
     return date_str
 
-  def extract_data(self) -> None:
+  def transform_dataframe_from_coingecko(self) -> None:
     """Load the trading volume data from the CSV file."""
 
     try:
@@ -98,7 +98,7 @@ class DataTransformer:
 
   def transform(self) -> None:
     self.transform_timestamps_from_coingecko()
-    self.extract_data()
+    self.transform_dataframe_from_coingecko()
     self.detect_outliers()
     return self.df
 
