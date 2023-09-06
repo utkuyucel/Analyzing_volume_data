@@ -7,6 +7,7 @@ import plotly.express as px
 import seaborn as sns
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
+from prophet import Prophet
 from sklearn.ensemble import IsolationForest
 from statsmodels.nonparametric.smoothers_lowess import lowess
 from sklearn.preprocessing import StandardScaler
@@ -73,12 +74,26 @@ class DataTransformer:
         logging.error(f"Error loading data: {str(e)}")
 
   def detect_outliers(self) -> None:
-    """Detect and remove outliers in the trading volume data using Isolation Forest."""
+    """Detect and remove outliers in the trading volume data using Prophet."""
 
-    iso = IsolationForest(contamination=0.05)
-    self.df['outlier'] = iso.fit_predict(self.df[['volume']].values)
-    self.outliers = self.df[self.df['outlier'] == -1]
-    self.df = self.df[self.df['outlier'] != -1]
+    
+    df_prophet = self.df[['date', 'volume']]
+    df_prophet.columns = ['ds', 'y']
+
+    
+    model = Prophet(yearly_seasonality=False, daily_seasonality=False)
+    model.add_seasonality(name='monthly', period=30.5, fourier_order=5)
+    model.fit(df_prophet)
+
+    
+    forecast = model.predict(df_prophet)
+
+    residuals = self.df['volume'] - forecast['yhat']
+    threshold = 3 * residuals.std()
+    outliers = (residuals.abs() > threshold).values
+
+    self.outliers = self.df[outliers]
+    self.df = self.df[~outliers]
     logging.info(f"Identified and removed {len(self.outliers)} outliers.")
 
   def transform(self) -> None:
@@ -402,7 +417,11 @@ class DataValidator:
         return False
 
     def validate(self) -> bool:
-
+        """Run all validation checks on the data.
+        
+        Returns:
+            bool: True if data passes all checks, False otherwise.
+        """
         if self.check_missing_values() or self.check_duplicates():
             logging.error("Data validation failed!")
             return False
