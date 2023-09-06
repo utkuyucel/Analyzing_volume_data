@@ -15,7 +15,7 @@ from plotly.subplots import make_subplots
 from scipy.spatial import ConvexHull
 from datetime import datetime
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(filename = "pipeline.log", level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
 class DataExtractor:
@@ -152,6 +152,7 @@ class DataAnalyzer:
     """Plot the trading volume along with its trend over time."""
   
     # Using lowess to smooth the curve
+    # (Computationally Expensive)
     smoothed = lowess(self.df['volume'], np.arange(len(self.df['volume'])), frac=0.1)
     self.df['trend'] = smoothed[:, 1]
     fig = px.line(self.df, x='date', y=['volume', 'trend'], title='Volume with Trend over Time')
@@ -378,12 +379,48 @@ class DataAnalyzer:
   def save_to_csv(self, file_path: str) -> None:
     self.df.to_csv(file_path)
 
+class DataValidator:
+    def __init__(self, data):
+        if isinstance(data, list):
+            self.df = pd.DataFrame(data)
+        elif isinstance(data, pd.DataFrame):
+            self.df = data
+        else:
+            raise ValueError("Unsupported data type. Please provide a list or a pandas DataFrame.")
+
+    def check_missing_values(self) -> bool:
+        missing_data = self.df.isnull().sum()
+        if missing_data.any():
+            logging.warning(f"Found missing data:\n{missing_data}")
+            return True
+        return False
+
+    def check_duplicates(self) -> bool:
+        if self.df.duplicated().any():
+            logging.warning("Found duplicate rows in the data!")
+            return True
+        return False
+
+    def validate(self) -> bool:
+
+        if self.check_missing_values() or self.check_duplicates():
+            logging.error("Data validation failed!")
+            return False
+        logging.info("Data validation passed!")
+        return True
+
 
 if __name__ == "__main__":
   ENDPOINT = "https://www.coingecko.com/exchanges/968/usd/1_year.json?locale=en"
   raw_data = DataExtractor().get_raw_data_from_api(ENDPOINT)
-  transformed_data = DataTransformer(raw_data).transform()
-  loader = DataLoader(transformed_data).save_to_csv("raw_data.csv")
-  analyzer = DataAnalyzer(transformed_data)
-  analyzer.perform_eda()
-  analyzer.save_to_csv("analyzed.csv")
+
+  data_validator = DataValidator(raw_data)
+  if not data_validator.validate():
+      raise ValueError("Data validation failed! Check logs for more details.")
+  else:
+
+    transformed_data = DataTransformer(raw_data).transform()
+    loader = DataLoader(transformed_data).save_to_csv("raw_data.csv")
+    analyzer = DataAnalyzer(transformed_data)
+    analyzer.perform_eda()
+    analyzer.save_to_csv("analyzed.csv")
