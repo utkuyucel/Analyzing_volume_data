@@ -45,7 +45,7 @@ class DataTransformer:
     self.df = data
     self.outliers = None
 
-  def transform_timestamps(self):
+  def transform_timestamps_from_api(self):
     # Transforming timestamps into dates
     processed_data = [(self._timestamp_to_date(item[0]), item[1].split(".")[0]) for item in self.df]
     self.df = pd.DataFrame(processed_data, columns = ["snapped_at", "volume"])
@@ -97,7 +97,7 @@ class DataTransformer:
     logging.info(f"Identified and removed {len(self.outliers)} outliers.")
 
   def transform(self) -> None:
-    self.transform_timestamps()
+    self.transform_timestamps_from_api()
     self.extract_data()
     self.detect_outliers()
     return self.df
