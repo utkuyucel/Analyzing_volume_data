@@ -390,9 +390,6 @@ class DataAnalyzer:
     self.heatmap_volume()
     self.perform_clustering()
 
-  
-  def save_to_csv(self, file_path: str) -> None:
-    self.df.to_csv(file_path)
 
 class DataValidator:
     def __init__(self, data):
@@ -442,4 +439,4 @@ if __name__ == "__main__":
     loader = DataLoader(transformed_data).save_to_csv("raw_data.csv")
     analyzer = DataAnalyzer(transformed_data)
     analyzer.perform_eda()
-    analyzer.save_to_csv("analyzed.csv")
+    analyzed_data = DataLoader(analyzer.df).save_to_csv("analyzed_data.csv")
