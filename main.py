@@ -349,32 +349,42 @@ class DataAnalyzer:
       # Determine if it's a weekend
       self.df['is_weekend'] = self.df['day_name'].isin(['Saturday', 'Sunday'])
       
-      # Calculate monthly average trading volume
-      monthly_averages = self.df.groupby(['month', 'is_weekend'])['volume'].mean().reset_index()
+      # Calculate monthly total trading volume for weekdays and weekends
+      monthly_totals = self.df.groupby(['month', 'is_weekend'])['volume'].sum().reset_index()
+      
+      # Calculate total days in each month
+      monthly_days = self.df.groupby('month').size().reset_index(name='days')
+      
+      # Merge totals with days
+      monthly_totals = monthly_totals.merge(monthly_days, on=['month'])
+      
+      # Calculate monthly average trading volume for weekdays and weekends based on total days
+      monthly_totals['average_volume'] = monthly_totals['volume'] / monthly_totals['days']
       
       # Add month names
       month_order = ['January', 'February', 'March', 'April', 'May', 'June', 
                     'July', 'August', 'September', 'October', 'November', 'December']
       month_name_map = dict(enumerate(month_order, 1))
-      monthly_averages['month_name'] = monthly_averages['month'].map(month_name_map)
+      monthly_totals['month_name'] = monthly_totals['month'].map(month_name_map)
       
       # Calculate percentage values
-      total_volumes = monthly_averages.groupby('month_name')['volume'].sum()
-      monthly_averages['percentage'] = monthly_averages.apply(lambda row: (row['volume'] / total_volumes[row['month_name']]) * 100, axis=1)
-      monthly_averages['text'] = monthly_averages['percentage'].round(2).astype(str) + '%'
+      total_volumes = monthly_totals.groupby('month_name')['average_volume'].sum()
+      monthly_totals['percentage'] = monthly_totals.apply(lambda row: (row['average_volume'] / total_volumes[row['month_name']]) * 100, axis=1)
+      monthly_totals['text'] = monthly_totals['percentage'].round(2).astype(str) + '%'
       
       # Visualize the averages
-      fig = px.bar(monthly_averages, 
+      fig = px.bar(monthly_totals, 
                   x='month_name', 
-                  y='volume', 
+                  y='average_volume', 
                   color='is_weekend',
                   title='Average Trading Volume by Month (Weekday vs Weekend)',
-                  labels={'is_weekend': 'Is Weekend?', 'volume': 'Average Volume'},
+                  labels={'is_weekend': 'Is Weekend?', 'average_volume': 'Average Volume'},
                   text='text'  # Add the percentage values
                   )
       fig.update_xaxes(categoryorder='array', categoryarray=month_order)
       fig.update_traces(textposition='inside')
       fig.show()
+
 
 
 
