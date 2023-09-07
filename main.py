@@ -111,8 +111,8 @@ class DataLoader:
 
 
 class DataAnalyzer:
-  def __init__(self, data : pd.DataFrame):
-    self.df = data
+  def __init__(self):
+    self.df = None
   
   def plot_data(self, title: str) -> None:
     """
@@ -378,7 +378,8 @@ class DataAnalyzer:
 
 
 
-  def perform_eda(self) -> None:
+  def perform_eda(self, data : pd.DataFrame) -> None:
+    self.df = data
     self.plot_data("Volume over Time (Removed The Outliers)")
     self.plot_trend()
     self.plot_volume_distribution()
@@ -437,6 +438,6 @@ if __name__ == "__main__":
 
     transformed_data = DataTransformer(raw_data).transform()
     loader = DataLoader(transformed_data).save_to_csv("raw_data.csv")
-    analyzer = DataAnalyzer(transformed_data)
-    analyzer.perform_eda()
+    analyzer = DataAnalyzer()
+    analyzer.perform_eda(transformed_data)
     analyzed_data = DataLoader(analyzer.df).save_to_csv("analyzed_data.csv")
