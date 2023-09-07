@@ -257,92 +257,100 @@ class DataAnalyzer:
     fig.update_xaxes(categoryorder='array', categoryarray=['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'])
     fig.show()
 
-
   def perform_clustering(self) -> None:
-    """Perform clustering on the trading volume data and visualize the results."""
+          """Perform clustering on the trading volume data and visualize the results."""
 
-    self.df['date_numeric'] = (self.df['date'] - self.df['date'].min()).dt.days
-    volume_data = self.df[['date_numeric', 'volume']]
-    
-    optimal_clusters = 3
+          self.df['date_numeric'] = (self.df['date'] - self.df['date'].min()).dt.days
+          volume_data = self.df[['date_numeric', 'volume']]
+          
+          optimal_clusters = 3
 
-    kmeans = KMeans(n_clusters=optimal_clusters, init='k-means++', random_state=42)
-    self.df['cluster'] = kmeans.fit_predict(volume_data)
-    
-    # Custom color map for clusters (Every cluster must be different color in a plot but each one must be same color in the whole analysis process.)
-    cluster_colors = {0: 'red', 1: 'blue', 2: 'green'}
-    
-    # Create an empty figure
-    fig = go.Figure()
+          kmeans = KMeans(n_clusters=optimal_clusters, init='k-means++', random_state=42)
+          self.df['cluster'] = kmeans.fit_predict(volume_data)
+          
+          # Custom color map for clusters
+          cluster_colors = {0: 'red', 1: 'blue', 2: 'green'}
+          
+          # Create an empty figure
+          fig = go.Figure()
 
-    # Add a scatter plot for each cluster with its color
-    for i in range(optimal_clusters):
-        cluster_data = self.df[self.df['cluster'] == i]
-        fig.add_trace(
-            go.Scatter(x=cluster_data['date'], y=cluster_data['volume'], 
-                      mode='markers', name=f'Cluster {i}', 
-                      marker=dict(color=cluster_colors[i]))
-        )
-        
-        if len(cluster_data) >= 3:  # Convex Hull -> Minimum 3 points
-            hull = ConvexHull(cluster_data[['date_numeric', 'volume']])
-            hull_points = hull.vertices.tolist()
-            hull_points.append(hull_points[0])  
-            fig.add_trace(
-                go.Scatter(x=cluster_data.iloc[hull_points]['date'], y=cluster_data.iloc[hull_points]['volume'], 
-                          mode='lines', showlegend=False, 
-                          line=dict(color=cluster_colors[i]))
-            )
+          # Add a scatter plot for each cluster with its color
+          for i in range(optimal_clusters):
+              cluster_data = self.df[self.df['cluster'] == i]
+              fig.add_trace(
+                  go.Scatter(x=cluster_data['date'], y=cluster_data['volume'], 
+                            mode='markers', name=f'Cluster {i}', 
+                            marker=dict(color=cluster_colors[i]))
+              )
+              
+              if len(cluster_data) >= 3:  # Convex Hull -> Minimum 3 points
+                  hull = ConvexHull(cluster_data[['date_numeric', 'volume']])
+                  hull_points = hull.vertices.tolist()
+                  hull_points.append(hull_points[0])  
+                  fig.add_trace(
+                      go.Scatter(x=cluster_data.iloc[hull_points]['date'], y=cluster_data.iloc[hull_points]['volume'], 
+                                mode='lines', showlegend=False, 
+                                line=dict(color=cluster_colors[i]))
+                  )
 
-    fig.update_layout(title='Clusters of Volume', xaxis_title='Date', yaxis_title='Volume')
-    fig.show()
+          fig.update_layout(title='Clusters of Volume', xaxis_title='Date', yaxis_title='Volume')
+          fig.show()
 
-    cluster_summaries = self.df.groupby('cluster')['volume'].agg(['mean', 'median', 'std', 'count'])
-    
-    # Daywise distribution of clusters
-    daywise_clusters = self.df.groupby(['day_name', 'cluster']).size().unstack().fillna(0)
-    daywise_total = daywise_clusters.sum(axis=1)
-    daywise_percentage = (daywise_clusters.divide(daywise_total, axis=0) * 100).round(2).astype(str) + '%'
+          self._plot_clustered_daywise_distribution(cluster_colors)
+          self._plot_clustered_monthwise_distribution(cluster_colors)
 
-    fig_daywise = go.Figure()
-    for i in range(optimal_clusters):
-        y_cumulative = daywise_clusters.iloc[:, :i].sum(axis=1)  # cumulative height up to the cluster of interest
-        fig_daywise.add_trace(
-            go.Bar(
-                x=daywise_clusters.index, 
-                y=daywise_clusters[i],
-                name=f'Cluster {i}',
-                marker_color=cluster_colors[i],
-                text=daywise_percentage[i],
-                textposition='inside',
-                insidetextanchor='middle',
-            )
-        )
-    fig_daywise.update_layout(title='Daywise Distribution of Clusters', xaxis_title='Day', yaxis_title='Count')
-    fig_daywise.show()
+  def _plot_clustered_daywise_distribution(self, cluster_colors) -> None:
+      """Plot the daywise distribution of clusters."""
 
-    # Monthwise distribution of clusters
-    monthwise_clusters = self.df.groupby(['month', 'cluster']).size().unstack().fillna(0)
-    monthwise_total = monthwise_clusters.sum(axis=1)
-    monthwise_percentage = (monthwise_clusters.divide(monthwise_total, axis=0) * 100).round(2).astype(str) + '%'
+      optimal_clusters = 3  # or however you determine this in your context
 
-    fig_monthwise = go.Figure()
-    for i in range(optimal_clusters):
-        y_cumulative = monthwise_clusters.iloc[:, :i].sum(axis=1)
-        fig_monthwise.add_trace(
-            go.Bar(
-                x=monthwise_clusters.index, 
-                y=monthwise_clusters[i],
-                name=f'Cluster {i}',
-                marker_color=cluster_colors[i],
-                text=monthwise_percentage[i],
-                textposition='inside',
-                insidetextanchor='middle',
-            )
-        )
-    fig_monthwise.update_layout(title='Monthwise Distribution of Clusters', xaxis_title='Month', yaxis_title='Count')
-    fig_monthwise.show()
-  
+      daywise_clusters = self.df.groupby(['day_name', 'cluster']).size().unstack().fillna(0)
+      daywise_total = daywise_clusters.sum(axis=1)
+      daywise_percentage = (daywise_clusters.divide(daywise_total, axis=0) * 100).round(2).astype(str) + '%'
+
+      fig_daywise = go.Figure()
+      for i in range(optimal_clusters):
+          y_cumulative = daywise_clusters.iloc[:, :i].sum(axis=1)  
+          fig_daywise.add_trace(
+              go.Bar(
+                  x=daywise_clusters.index, 
+                  y=daywise_clusters[i],
+                  name=f'Cluster {i}',
+                  marker_color=cluster_colors[i],
+                  text=daywise_percentage[i],
+                  textposition='inside',
+                  insidetextanchor='middle',
+              )
+          )
+      fig_daywise.update_layout(title='Daywise Distribution of Clusters', xaxis_title='Day', yaxis_title='Count')
+      fig_daywise.show()
+
+  def _plot_clustered_monthwise_distribution(self, cluster_colors) -> None:
+      """Plot the monthwise distribution of clusters."""
+
+      optimal_clusters = 3  # or however you determine this in your context
+
+      monthwise_clusters = self.df.groupby(['month', 'cluster']).size().unstack().fillna(0)
+      monthwise_total = monthwise_clusters.sum(axis=1)
+      monthwise_percentage = (monthwise_clusters.divide(monthwise_total, axis=0) * 100).round(2).astype(str) + '%'
+
+      fig_monthwise = go.Figure()
+      for i in range(optimal_clusters):
+          y_cumulative = monthwise_clusters.iloc[:, :i].sum(axis=1)
+          fig_monthwise.add_trace(
+              go.Bar(
+                  x=monthwise_clusters.index, 
+                  y=monthwise_clusters[i],
+                  name=f'Cluster {i}',
+                  marker_color=cluster_colors[i],
+                  text=monthwise_percentage[i],
+                  textposition='inside',
+                  insidetextanchor='middle',
+              )
+          )
+      fig_monthwise.update_layout(title='Monthwise Distribution of Clusters', xaxis_title='Month', yaxis_title='Count')
+      fig_monthwise.show()
+
   def plot_weekday_vs_weekend_monthly_averages(self) -> None:
       """Plot the average trading volumes for weekdays vs weekends for each month with percentage annotations."""
       
