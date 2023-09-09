@@ -8,7 +8,6 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 from prophet import Prophet
-from sklearn.ensemble import IsolationForest
 from statsmodels.nonparametric.smoothers_lowess import lowess
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
