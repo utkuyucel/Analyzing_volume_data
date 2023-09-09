@@ -75,16 +75,16 @@ class DataTransformer:
   def detect_outliers(self) -> None:
     """Detect and remove outliers in the trading volume data using Prophet."""
 
-    
+
     df_prophet = self.df[['date', 'volume']]
     df_prophet.columns = ['ds', 'y']
 
-    
+
     model = Prophet(yearly_seasonality=False, daily_seasonality=False)
     model.add_seasonality(name='monthly', period=30.5, fourier_order=5)
     model.fit(df_prophet)
 
-    
+
     forecast = model.predict(df_prophet)
 
     residuals = self.df['volume'] - forecast['yhat']
@@ -112,7 +112,7 @@ class DataLoader:
 class DataAnalyzer:
   def __init__(self):
     self.df = None
-  
+
   def plot_data(self, title: str) -> None:
     """
     Plot the trading volume data.
@@ -130,7 +130,7 @@ class DataAnalyzer:
       heatmap_data = self.df.groupby(['day_name', 'month'])['volume'].mean().unstack()
       days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
       heatmap_data = heatmap_data.reindex(days_order)
-      
+
       # Create the heatmap with annotations
       fig = go.Figure(go.Heatmap(
           z=heatmap_data.values,
@@ -149,22 +149,22 @@ class DataAnalyzer:
       for i, row in enumerate(heatmap_data.values):
           for j, value in enumerate(row):
               fig.add_annotation(go.layout.Annotation(
-                  text=f"{round(value, 2)}$", 
-                  x=heatmap_data.columns[j], 
-                  y=days_order[i], 
-                  xref='x1', 
-                  yref='y1', 
+                  text=f"{round(value, 2)}$",
+                  x=heatmap_data.columns[j],
+                  y=days_order[i],
+                  xref='x1',
+                  yref='y1',
                   showarrow=False,
                   font=dict(color="white" if value > (heatmap_data.values.max() / 2) else "black")
               ))
-      
+
       fig.update_layout(title='Average Volume by Day and Month', xaxis=dict(title='Month'), yaxis=dict(title='Day'))
       fig.show()
 
-    
+
   def plot_trend(self) -> None:
     """Plot the trading volume along with its trend over time."""
-  
+
     # Using lowess to smooth the curve
     # (Computationally Expensive)
     smoothed = lowess(self.df['volume'], np.arange(len(self.df['volume'])), frac=0.1)
@@ -180,18 +180,18 @@ class DataAnalyzer:
     median_volume = self.df["volume"].median()
     p_05 = self.df["volume"].quantile(0.05)
     p_95 = self.df["volume"].quantile(0.95)
-    
-    fig = px.histogram(self.df, 
-                      x="volume", 
-                      nbins=50, 
+
+    fig = px.histogram(self.df,
+                      x="volume",
+                      nbins=50,
                       title='Volume Distribution',
                       color="is_weekend",
-                      marginal="violin", 
-                      hover_data=self.df.columns) 
-    
+                      marginal="violin",
+                      hover_data=self.df.columns)
+
     fig.add_vline(x=mean_volume, line_dash="dash", line_color="blue", name="Mean")
     fig.add_vline(x=median_volume, line_dash="dash", line_color="green", name="Median")
-    
+
     # Shading Outliers
     fig.add_vrect(x0=p_05, x1=p_95, fillcolor='rgba(0,0,0,0)', line=dict(color="red", dash="dash"), name="5th-95th Percentile")
 
@@ -202,7 +202,7 @@ class DataAnalyzer:
     fig.add_annotation(x=p_95, y=0.6, yref='paper', text="95th Percentile", showarrow=False)
 
     fig.show()
-    
+
   def _set_day_order(self) -> None:
     """Set the order of days for plotting purposes."""
 
@@ -219,23 +219,38 @@ class DataAnalyzer:
     month_name_map = dict(enumerate(month_order, 1))
     self.df['month_name'] = self.df['month'].map(month_name_map)
     self.df['month_name'] = pd.Categorical(self.df['month_name'], categories=month_order, ordered=True)
-  
+
   def plot_daywise_distribution(self) -> None:
     """Plot the distribution of trading volumes for each day of the week."""
-  
+
     self._set_day_order()
     fig = px.box(self.df, x='day_name', y='volume', title='Volume Distribution by Day of Week', points="all")
     fig.update_xaxes(categoryorder='array', categoryarray=['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])
     fig.show()
 
   def plot_daywise_summary(self) -> None:
-    """Plot the summary of average trading volumes for each day of the week."""
+      """Plot the summary of average trading volumes for each day of the week."""
 
-    self._set_day_order()
-    daywise_volume = self.df.groupby('day_name')['volume'].mean().reset_index()
-    fig = px.bar(daywise_volume, x='day_name', y='volume', title='Daywise Trading Volume Summary')
-    fig.update_xaxes(categoryorder='array', categoryarray=['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])
-    fig.show()
+      self._set_day_order()
+      daywise_volume = self.df.groupby('day_name')['volume'].mean().reset_index()
+      
+      # Format the volume as integer and add a dollar sign in front
+      formatted_volume = '$' + daywise_volume['volume'].round(0).astype(int).astype(str)
+      
+      fig = px.bar(daywise_volume, 
+                  x='day_name', 
+                  y='volume', 
+                  title='Daywise Trading Volume Summary',
+                  text=formatted_volume  # Add formatted volume values
+                  )
+      
+      fig.update_xaxes(categoryorder='array', categoryarray=['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])
+      
+      # Update the position of the text to be inside the bars
+      fig.update_traces(textposition='inside')
+      
+      fig.show()
+
 
 
   def plot_monthwise_distribution(self) -> None:
@@ -248,28 +263,40 @@ class DataAnalyzer:
 
 
   def plot_monthwise_summary(self) -> None:
-    """Plot the summary of average trading volumes for each month."""
+      """Plot the summary of average trading volumes for each month."""
 
-    self._set_month_order()
-    monthly_volume = self.df.groupby('month_name')['volume'].mean().reset_index()
-    fig = px.bar(monthly_volume, x='month_name', y='volume', title='Monthly Trading Volume Summary')
-    fig.update_xaxes(categoryorder='array', categoryarray=['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'])
-    fig.show()
+      self._set_month_order()
+      monthly_volume = self.df.groupby('month_name')['volume'].mean().reset_index()
+      
+      formatted_volume = '$' + monthly_volume['volume'].round(0).astype(int).astype(str)
+      
+      fig = px.bar(monthly_volume, 
+                  x='month_name', 
+                  y='volume', 
+                  title='Monthly Trading Volume Summary',
+                  text=formatted_volume  
+                  )
+      
+      fig.update_xaxes(categoryorder='array', categoryarray=['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'])
+      fig.update_traces(textposition='inside')
+      
+      fig.show()
+
 
   def perform_clustering(self) -> None:
           """Perform clustering on the trading volume data and visualize the results."""
 
           self.df['date_numeric'] = (self.df['date'] - self.df['date'].min()).dt.days
           volume_data = self.df[['date_numeric', 'volume']]
-          
+
           optimal_clusters = 3
 
           kmeans = KMeans(n_clusters=optimal_clusters, init='k-means++', random_state=42)
           self.df['cluster'] = kmeans.fit_predict(volume_data)
-          
+
           # Custom color map for clusters
           cluster_colors = {0: 'red', 1: 'blue', 2: 'green'}
-          
+
           # Create an empty figure
           fig = go.Figure()
 
@@ -277,18 +304,18 @@ class DataAnalyzer:
           for i in range(optimal_clusters):
               cluster_data = self.df[self.df['cluster'] == i]
               fig.add_trace(
-                  go.Scatter(x=cluster_data['date'], y=cluster_data['volume'], 
-                            mode='markers', name=f'Cluster {i}', 
+                  go.Scatter(x=cluster_data['date'], y=cluster_data['volume'],
+                            mode='markers', name=f'Cluster {i}',
                             marker=dict(color=cluster_colors[i]))
               )
-              
+
               if len(cluster_data) >= 3:  # Convex Hull -> Minimum 3 points
                   hull = ConvexHull(cluster_data[['date_numeric', 'volume']])
                   hull_points = hull.vertices.tolist()
-                  hull_points.append(hull_points[0])  
+                  hull_points.append(hull_points[0])
                   fig.add_trace(
-                      go.Scatter(x=cluster_data.iloc[hull_points]['date'], y=cluster_data.iloc[hull_points]['volume'], 
-                                mode='lines', showlegend=False, 
+                      go.Scatter(x=cluster_data.iloc[hull_points]['date'], y=cluster_data.iloc[hull_points]['volume'],
+                                mode='lines', showlegend=False,
                                 line=dict(color=cluster_colors[i]))
                   )
 
@@ -309,10 +336,10 @@ class DataAnalyzer:
 
       fig_daywise = go.Figure()
       for i in range(optimal_clusters):
-          y_cumulative = daywise_clusters.iloc[:, :i].sum(axis=1)  
+          y_cumulative = daywise_clusters.iloc[:, :i].sum(axis=1)
           fig_daywise.add_trace(
               go.Bar(
-                  x=daywise_clusters.index, 
+                  x=daywise_clusters.index,
                   y=daywise_clusters[i],
                   name=f'Cluster {i}',
                   marker_color=cluster_colors[i],
@@ -338,7 +365,7 @@ class DataAnalyzer:
           y_cumulative = monthwise_clusters.iloc[:, :i].sum(axis=1)
           fig_monthwise.add_trace(
               go.Bar(
-                  x=monthwise_clusters.index, 
+                  x=monthwise_clusters.index,
                   y=monthwise_clusters[i],
                   name=f'Cluster {i}',
                   marker_color=cluster_colors[i],
@@ -352,37 +379,37 @@ class DataAnalyzer:
 
   def plot_weekday_vs_weekend_monthly_averages(self) -> None:
       """Plot the average trading volumes for weekdays vs weekends for each month with percentage annotations."""
-      
+
       # Determine if it's a weekend
       self.df['is_weekend'] = self.df['day_name'].isin(['Saturday', 'Sunday'])
-      
+
       # Calculate monthly total trading volume for weekdays and weekends
       monthly_totals = self.df.groupby(['month', 'is_weekend'])['volume'].sum().reset_index()
-      
+
       # Calculate total days in each month
       monthly_days = self.df.groupby('month').size().reset_index(name='days')
-      
+
       # Merge totals with days
       monthly_totals = monthly_totals.merge(monthly_days, on=['month'])
-      
+
       # Calculate monthly average trading volume for weekdays and weekends based on total days
       monthly_totals['average_volume'] = monthly_totals['volume'] / monthly_totals['days']
-      
+
       # Add month names
-      month_order = ['January', 'February', 'March', 'April', 'May', 'June', 
+      month_order = ['January', 'February', 'March', 'April', 'May', 'June',
                     'July', 'August', 'September', 'October', 'November', 'December']
       month_name_map = dict(enumerate(month_order, 1))
       monthly_totals['month_name'] = monthly_totals['month'].map(month_name_map)
-      
+
       # Calculate percentage values
       total_volumes = monthly_totals.groupby('month_name')['average_volume'].sum()
       monthly_totals['percentage'] = monthly_totals.apply(lambda row: (row['average_volume'] / total_volumes[row['month_name']]) * 100, axis=1)
       monthly_totals['text'] = monthly_totals['percentage'].round(2).astype(str) + '%'
-      
+
       # Visualize the averages
-      fig = px.bar(monthly_totals, 
-                  x='month_name', 
-                  y='average_volume', 
+      fig = px.bar(monthly_totals,
+                  x='month_name',
+                  y='average_volume',
                   color='is_weekend',
                   title='Average Trading Volume by Month (Weekday vs Weekend)',
                   labels={'is_weekend': 'Is Weekend?', 'average_volume': 'Average Volume'},
@@ -433,7 +460,7 @@ class DataValidator:
 
     def validate(self) -> bool:
         """Run all validation checks on the data.
-        
+
         Returns:
             bool: True if data passes all checks, False otherwise.
         """
