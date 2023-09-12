@@ -472,8 +472,10 @@ class DataValidator:
 
 
 if __name__ == "__main__":
+
   ENDPOINT = "https://www.coingecko.com/exchanges/968/usd/1_year.json?locale=en"
-  raw_data = DataExtractor().get_raw_data_from_coingecko(ENDPOINT)
+  DataExtractor = DataExtractor()
+  raw_data = DataExtractor.get_raw_data_from_coingecko(ENDPOINT)
 
   data_validator = DataValidator(raw_data)
   if not data_validator.validate():
@@ -482,6 +484,7 @@ if __name__ == "__main__":
 
     transformed_data = DataTransformer(raw_data).transform()
     loader = DataLoader(transformed_data).save_to_csv("raw_data.csv")
+
     analyzer = DataAnalyzer()
     analyzer.perform_eda(transformed_data)
     analyzed_data = DataLoader(analyzer.df).save_to_csv("analyzed_data.csv")
