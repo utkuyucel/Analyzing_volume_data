@@ -35,7 +35,7 @@ class DataExtractor:
     raw_data = response.json()["volumes"]
 
     self.raw_data = raw_data
-    return raw_data
+    return self.raw_data
 
 
 
