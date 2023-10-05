@@ -43,11 +43,24 @@ class DataTransformer:
   def __init__(self, data: pd.DataFrame):
     self.df = data
     self.outliers = None
+    self.btc_data = None
+
+  
+  def _get_btc_data(self):
+    start_date = self.df["date"].min()
+    end_date = self.df["date"].max()
+
+    ticker = yf.Ticker("BTC-USD")
+    historical_data = ticker.history(start = start_date, end = end_date).reset_index()
+    historical_data.rename(columns = {"Date": "date", "Close": "btc_price"}, inplace = True)
+    historical_data['date'] = historical_data['date'].dt.tz_localize(None)
+    return historical_data[["date", "btc_price"]]
 
   def transform_timestamps_from_coingecko(self):
     # Transforming timestamps into dates
     processed_data = [(self._timestamp_to_date(item[0]), item[1].split(".")[0]) for item in self.df]
     self.df = pd.DataFrame(processed_data, columns = ["snapped_at", "volume"])
+
     return self.df
 
 
@@ -69,6 +82,8 @@ class DataTransformer:
         self.df["day_name"] = self.df["snapped_at"].dt.day_name()
         self.df["is_weekend"] = self.df["day_name"].isin(["Saturday", "Sunday"])
         self.df = self.df[["date", "month", "day_name", "is_weekend", "volume"]]
+        # Ensure 'snapped_at' column is of type datetime64[ns] right after creation
+        self.df['date'] = pd.to_datetime(self.df['date'])
     except Exception as e:
         logging.error(f"Error loading data: {str(e)}")
 
@@ -99,7 +114,13 @@ class DataTransformer:
     self.transform_timestamps_from_coingecko()
     self.transform_dataframe_from_coingecko()
     self.detect_outliers()
-    return self.df
+
+    # self.df['date'] = pd.to_datetime(self.df['date'])
+
+    self.btc_data = self._get_btc_data()
+    self.merged_data = pd.merge(self.df, self.btc_data, on = "date", how = "inner")
+
+    return self.merged_data
 
 class DataLoader:
   def __init__(self, data : pd.DataFrame):
