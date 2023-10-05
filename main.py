@@ -1,4 +1,6 @@
 from __future__ import annotations
+from typing import Tuple
+from scipy.stats import pearsonr
 import pandas as pd
 import numpy as np
 import requests
@@ -133,6 +135,25 @@ class DataLoader:
 class DataAnalyzer:
   def __init__(self):
     self.df = None
+    self.correlation = None
+
+  def calculate_correlation(self) -> Tuple[float, float]:
+    """
+    Initialize the DataAnalyzer with a DataFrame containing 'volume' and 'btc_price' columns.
+
+    :param data: DataFrame containing 'volume' and 'btc_price' columns.
+    """
+    self.correlation, p_value = pearsonr(self.df["volume"], self.df["btc_price"])
+    return self.correlation, p_value
+
+  def visualize_correlation(self) -> None:
+      """
+      Visualize the correlation between 'volume' and 'btc_price' using Plotly scatter plot.
+      """
+      # Dependent: Volume
+      # Independent: BTC Price
+      fig = px.scatter(self.df, x='btc_price', y='volume', title=f'Correlation between Volume and BTC Price: {self.correlation:.2f}')
+      fig.show()
 
   def plot_data(self, title: str) -> None:
     """
@@ -470,4 +491,6 @@ if __name__ == "__main__":
 
     analyzer = DataAnalyzer()
     analyzer.perform_eda(transformed_data)
+    corr, p_value = analyzer.calculate_correlation()
+    analyzer.visualize_correlation()
     analyzed_data = DataLoader(analyzer.df).save_to_csv("analyzed_data.csv")
