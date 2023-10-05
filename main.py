@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Tuple
 from scipy.stats import pearsonr
+import statsmodels.api as sm
 import pandas as pd
 import numpy as np
 import requests
@@ -135,25 +136,35 @@ class DataLoader:
 class DataAnalyzer:
   def __init__(self):
     self.df = None
-    self.correlation = None
 
-  def calculate_correlation(self) -> Tuple[float, float]:
+
+  def perform_regression(self, data: pd.DataFrame):
     """
-    Initialize the DataAnalyzer with a DataFrame containing 'volume' and 'btc_price' columns.
-
-    :param data: DataFrame containing 'volume' and 'btc_price' columns.
+    Perform a simple linear regression with BTC Price as the independent variable 
+    and Volume as the dependent variable, and visualize the result.
     """
-    self.correlation, p_value = pearsonr(self.df["volume"], self.df["btc_price"])
-    return self.correlation, p_value
+    Y = data['volume']
+    X = data['btc_price']
+    X = sm.add_constant(X)  # Adding a constant term for intercept
+    
+    # Fitting the regression model
+    model = sm.OLS(Y, X).fit()
+    
+    # Predicted values
+    data['predicted_volume'] = model.predict(X)
+    
+    # Calculating the Pearson correlation coefficient and p-value
+    corr_coef, p_value = pearsonr(data['btc_price'], data['volume'])
+    
+    # Plotting
+    title_text = (f'BTC Price vs Volume<br>'
+                  f'Correlation: {corr_coef:.2f}, p-value: {p_value:.4f}')
+    
+    fig = px.scatter(data, x='btc_price', y='volume', title=title_text)
+    fig.add_scatter(x=data['btc_price'], y=data['predicted_volume'], mode='lines', name='Regression Line')
+    
+    fig.show()
 
-  def visualize_correlation(self) -> None:
-      """
-      Visualize the correlation between 'volume' and 'btc_price' using Plotly scatter plot.
-      """
-      # Dependent: Volume
-      # Independent: BTC Price
-      fig = px.scatter(self.df, x='btc_price', y='volume', title=f'Correlation between Volume and BTC Price: {self.correlation:.2f}')
-      fig.show()
 
   def plot_data(self, title: str) -> None:
     """
@@ -491,6 +502,5 @@ if __name__ == "__main__":
 
     analyzer = DataAnalyzer()
     analyzer.perform_eda(transformed_data)
-    corr, p_value = analyzer.calculate_correlation()
-    analyzer.visualize_correlation()
+    analyzer.perform_regression(analyzer.df)
     analyzed_data = DataLoader(analyzer.df).save_to_csv("analyzed_data.csv")
