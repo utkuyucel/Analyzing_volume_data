@@ -124,43 +124,6 @@ class DataAnalyzer:
     fig = px.line(self.df, x='date', y='volume', title=title)
     fig.show()
 
-  def heatmap_volume(self) -> None:
-      """Generate a heatmap visualizing average volume by day and month."""
-
-      heatmap_data = self.df.groupby(['day_name', 'month'])['volume'].mean().unstack()
-      days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-      heatmap_data = heatmap_data.reindex(days_order)
-
-      # Create the heatmap with annotations
-      fig = go.Figure(go.Heatmap(
-          z=heatmap_data.values,
-          x=heatmap_data.columns,
-          y=heatmap_data.index,
-          colorscale='Viridis',
-          hoverongaps=False,
-          hoverinfo='z',
-          zauto=False,
-          zmax=heatmap_data.values.max(),
-          zmin=heatmap_data.values.min(),
-          showscale=True
-      ))
-
-      # Add annotations with a '$' symbol at the end
-      for i, row in enumerate(heatmap_data.values):
-          for j, value in enumerate(row):
-              fig.add_annotation(go.layout.Annotation(
-                  text=f"{round(value, 2)}$",
-                  x=heatmap_data.columns[j],
-                  y=days_order[i],
-                  xref='x1',
-                  yref='y1',
-                  showarrow=False,
-                  font=dict(color="white" if value > (heatmap_data.values.max() / 2) else "black")
-              ))
-
-      fig.update_layout(title='Average Volume by Day and Month', xaxis=dict(title='Month'), yaxis=dict(title='Day'))
-      fig.show()
-
 
   def plot_trend(self) -> None:
     """Plot the trading volume along with its trend over time."""
@@ -432,7 +395,6 @@ class DataAnalyzer:
     self.plot_monthwise_summary()
     self.plot_weekday_vs_weekend_monthly_averages()
     self.plot_monthwise_distribution()
-    self.heatmap_volume()
     self.perform_clustering()
 
 
