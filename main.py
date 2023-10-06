@@ -3,6 +3,7 @@ from typing import Tuple
 from scipy.stats import pearsonr
 import statsmodels.api as sm
 import pandas as pd
+import yfinance as yf
 import numpy as np
 import requests
 import logging
@@ -47,17 +48,49 @@ class DataTransformer:
     self.df = data
     self.outliers = None
     self.btc_data = None
+    self.start_date = None
+    self.start_date = None
 
-  
+
   def _get_btc_data(self):
-    start_date = self.df["date"].min()
-    end_date = self.df["date"].max()
+    self.start_date = self.df["date"].min()
+    self.end_date = self.df["date"].max()
 
     ticker = yf.Ticker("BTC-USD")
-    historical_data = ticker.history(start = start_date, end = end_date).reset_index()
+    historical_data = ticker.history(start = self.start_date, end = self.end_date).reset_index()
     historical_data.rename(columns = {"Date": "date", "Close": "btc_price"}, inplace = True)
     historical_data['date'] = historical_data['date'].dt.tz_localize(None)
     return historical_data[["date", "btc_price"]]
+
+  def _get_vix_data(self):
+    self.start_date = self.df["date"].min()
+    self.end_date = self.df["date"].max()
+
+    ticker = yf.Ticker("^VIX")
+    historical_data = ticker.history(start=self.start_date, end=self.end_date).reset_index()
+    historical_data.rename(columns={"Date": "date", "Close": "vix"}, inplace=True)
+    historical_data['date'] = historical_data['date'].dt.tz_localize(None)
+
+    # Create a date range from start_date to end_date
+    full_date_range = pd.date_range(start=self.start_date, end=self.end_date)
+
+    # Identify missing dates
+    missing_dates = full_date_range.difference(historical_data['date'])
+
+    # Calculate weekly averages
+    historical_data.set_index('date', inplace=True)
+    weekly_avg = historical_data.resample('W-SUN').mean()
+
+    # Fill missing weekend dates with previous week's average
+    for missing_date in missing_dates:
+        if missing_date.weekday() >= 5:  # If Saturday or Sunday
+            prev_sunday = missing_date - pd.Timedelta(days=(missing_date.weekday() - 6))
+            historical_data.loc[missing_date] = weekly_avg.loc[prev_sunday]
+
+    historical_data.reset_index(inplace=True)
+
+    return historical_data[["date", "vix"]]
+
 
   def transform_timestamps_from_coingecko(self):
     # Transforming timestamps into dates
@@ -113,6 +146,8 @@ class DataTransformer:
     self.df = self.df[~outliers]
     logging.info(f"Identified and removed {len(self.outliers)} outliers.")
 
+
+
   def transform(self) -> None:
     self.transform_timestamps_from_coingecko()
     self.transform_dataframe_from_coingecko()
@@ -121,7 +156,9 @@ class DataTransformer:
     # self.df['date'] = pd.to_datetime(self.df['date'])
 
     self.btc_data = self._get_btc_data()
+    # Merge BTC and Df
     self.merged_data = pd.merge(self.df, self.btc_data, on = "date", how = "inner")
+
 
     return self.merged_data
 
@@ -138,31 +175,31 @@ class DataAnalyzer:
     self.df = None
 
 
-  def perform_regression(self, data: pd.DataFrame):
+  def perform_regression(self,data: pd.DataFrame):
     """
-    Perform a simple linear regression with BTC Price as the independent variable 
+    Perform a simple linear regression with BTC Price as the independent variable
     and Volume as the dependent variable, and visualize the result.
     """
     Y = data['volume']
     X = data['btc_price']
     X = sm.add_constant(X)  # Adding a constant term for intercept
-    
+
     # Fitting the regression model
     model = sm.OLS(Y, X).fit()
-    
+
     # Predicted values
     data['predicted_volume'] = model.predict(X)
-    
+
     # Calculating the Pearson correlation coefficient and p-value
     corr_coef, p_value = pearsonr(data['btc_price'], data['volume'])
-    
+
     # Plotting
     title_text = (f'BTC Price vs Volume<br>'
                   f'Correlation: {corr_coef:.2f}, p-value: {p_value:.4f}')
-    
+
     fig = px.scatter(data, x='btc_price', y='volume', title=title_text)
     fig.add_scatter(x=data['btc_price'], y=data['predicted_volume'], mode='lines', name='Regression Line')
-    
+
     fig.show()
 
 
@@ -249,22 +286,22 @@ class DataAnalyzer:
 
       self._set_day_order()
       daywise_volume = self.df.groupby('day_name')['volume'].mean().reset_index()
-      
+
       # Format the volume as integer and add a dollar sign in front
       formatted_volume = '$' + daywise_volume['volume'].round(0).astype(int).astype(str)
-      
-      fig = px.bar(daywise_volume, 
-                  x='day_name', 
-                  y='volume', 
+
+      fig = px.bar(daywise_volume,
+                  x='day_name',
+                  y='volume',
                   title='Daywise Trading Volume Summary',
                   text=formatted_volume  # Add formatted volume values
                   )
-      
+
       fig.update_xaxes(categoryorder='array', categoryarray=['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])
-      
+
       # Update the position of the text to be inside the bars
       fig.update_traces(textposition='inside')
-      
+
       fig.show()
 
 
@@ -279,161 +316,161 @@ class DataAnalyzer:
 
 
   def plot_monthwise_summary(self) -> None:
-      """Plot the summary of average trading volumes for each month."""
+    """Plot the summary of average trading volumes for each month."""
 
-      self._set_month_order()
-      monthly_volume = self.df.groupby('month_name')['volume'].mean().reset_index()
-      
-      formatted_volume = '$' + monthly_volume['volume'].round(0).astype(int).astype(str)
-      
-      fig = px.bar(monthly_volume, 
-                  x='month_name', 
-                  y='volume', 
-                  title='Monthly Trading Volume Summary',
-                  text=formatted_volume  
-                  )
-      
-      fig.update_xaxes(categoryorder='array', categoryarray=['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'])
-      fig.update_traces(textposition='inside')
-      
-      fig.show()
+    self._set_month_order()
+    monthly_volume = self.df.groupby('month_name')['volume'].mean().reset_index()
+
+    formatted_volume = '$' + monthly_volume['volume'].round(0).astype(int).astype(str)
+
+    fig = px.bar(monthly_volume,
+                x='month_name',
+                y='volume',
+                title='Monthly Trading Volume Summary',
+                text=formatted_volume
+                )
+
+    fig.update_xaxes(categoryorder='array', categoryarray=['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'])
+    fig.update_traces(textposition='inside')
+
+    fig.show()
 
 
   def perform_clustering(self) -> None:
-          """Perform clustering on the trading volume data and visualize the results."""
+    """Perform clustering on the trading volume data and visualize the results."""
 
-          self.df['date_numeric'] = (self.df['date'] - self.df['date'].min()).dt.days
-          volume_data = self.df[['date_numeric', 'volume']]
+    self.df['date_numeric'] = (self.df['date'] - self.df['date'].min()).dt.days
+    volume_data = self.df[['date_numeric', 'volume']]
 
-          optimal_clusters = 3
+    optimal_clusters = 3
 
-          kmeans = KMeans(n_clusters=optimal_clusters, init='k-means++', random_state=42)
-          self.df['cluster'] = kmeans.fit_predict(volume_data)
+    kmeans = KMeans(n_clusters=optimal_clusters, init='k-means++', random_state=42)
+    self.df['cluster'] = kmeans.fit_predict(volume_data)
 
-          # Custom color map for clusters
-          cluster_colors = {0: 'red', 1: 'blue', 2: 'green'}
+    # Custom color map for clusters
+    cluster_colors = {0: 'red', 1: 'blue', 2: 'green'}
 
-          # Create an empty figure
-          fig = go.Figure()
+    # Create an empty figure
+    fig = go.Figure()
 
-          # Add a scatter plot for each cluster with its color
-          for i in range(optimal_clusters):
-              cluster_data = self.df[self.df['cluster'] == i]
-              fig.add_trace(
-                  go.Scatter(x=cluster_data['date'], y=cluster_data['volume'],
-                            mode='markers', name=f'Cluster {i}',
-                            marker=dict(color=cluster_colors[i]))
-              )
+    # Add a scatter plot for each cluster with its color
+    for i in range(optimal_clusters):
+        cluster_data = self.df[self.df['cluster'] == i]
+        fig.add_trace(
+            go.Scatter(x=cluster_data['date'], y=cluster_data['volume'],
+                      mode='markers', name=f'Cluster {i}',
+                      marker=dict(color=cluster_colors[i]))
+        )
 
-              if len(cluster_data) >= 3:  # Convex Hull -> Minimum 3 points
-                  hull = ConvexHull(cluster_data[['date_numeric', 'volume']])
-                  hull_points = hull.vertices.tolist()
-                  hull_points.append(hull_points[0])
-                  fig.add_trace(
-                      go.Scatter(x=cluster_data.iloc[hull_points]['date'], y=cluster_data.iloc[hull_points]['volume'],
-                                mode='lines', showlegend=False,
-                                line=dict(color=cluster_colors[i]))
-                  )
+        if len(cluster_data) >= 3:  # Convex Hull -> Minimum 3 points
+            hull = ConvexHull(cluster_data[['date_numeric', 'volume']])
+            hull_points = hull.vertices.tolist()
+            hull_points.append(hull_points[0])
+            fig.add_trace(
+                go.Scatter(x=cluster_data.iloc[hull_points]['date'], y=cluster_data.iloc[hull_points]['volume'],
+                          mode='lines', showlegend=False,
+                          line=dict(color=cluster_colors[i]))
+            )
 
-          fig.update_layout(title='Clusters of Volume', xaxis_title='Date', yaxis_title='Volume')
-          fig.show()
+    fig.update_layout(title='Clusters of Volume', xaxis_title='Date', yaxis_title='Volume')
+    fig.show()
 
-          self._plot_clustered_daywise_distribution(cluster_colors)
-          self._plot_clustered_monthwise_distribution(cluster_colors)
+    self._plot_clustered_daywise_distribution(cluster_colors)
+    self._plot_clustered_monthwise_distribution(cluster_colors)
 
   def _plot_clustered_daywise_distribution(self, cluster_colors) -> None:
-      """Plot the daywise distribution of clusters."""
+    """Plot the daywise distribution of clusters."""
 
-      optimal_clusters = 3  # or however you determine this in your context
+    optimal_clusters = 3  # or however you determine this in your context
 
-      daywise_clusters = self.df.groupby(['day_name', 'cluster']).size().unstack().fillna(0)
-      daywise_total = daywise_clusters.sum(axis=1)
-      daywise_percentage = (daywise_clusters.divide(daywise_total, axis=0) * 100).round(2).astype(str) + '%'
+    daywise_clusters = self.df.groupby(['day_name', 'cluster']).size().unstack().fillna(0)
+    daywise_total = daywise_clusters.sum(axis=1)
+    daywise_percentage = (daywise_clusters.divide(daywise_total, axis=0) * 100).round(2).astype(str) + '%'
 
-      fig_daywise = go.Figure()
-      for i in range(optimal_clusters):
-          y_cumulative = daywise_clusters.iloc[:, :i].sum(axis=1)
-          fig_daywise.add_trace(
-              go.Bar(
-                  x=daywise_clusters.index,
-                  y=daywise_clusters[i],
-                  name=f'Cluster {i}',
-                  marker_color=cluster_colors[i],
-                  text=daywise_percentage[i],
-                  textposition='inside',
-                  insidetextanchor='middle',
-              )
-          )
-      fig_daywise.update_layout(title='Daywise Distribution of Clusters', xaxis_title='Day', yaxis_title='Count')
-      fig_daywise.show()
+    fig_daywise = go.Figure()
+    for i in range(optimal_clusters):
+        y_cumulative = daywise_clusters.iloc[:, :i].sum(axis=1)
+        fig_daywise.add_trace(
+            go.Bar(
+                x=daywise_clusters.index,
+                y=daywise_clusters[i],
+                name=f'Cluster {i}',
+                marker_color=cluster_colors[i],
+                text=daywise_percentage[i],
+                textposition='inside',
+                insidetextanchor='middle',
+            )
+        )
+    fig_daywise.update_layout(title='Daywise Distribution of Clusters', xaxis_title='Day', yaxis_title='Count')
+    fig_daywise.show()
 
   def _plot_clustered_monthwise_distribution(self, cluster_colors) -> None:
-      """Plot the monthwise distribution of clusters."""
+    """Plot the monthwise distribution of clusters."""
 
-      optimal_clusters = 3  # or however you determine this in your context
+    optimal_clusters = 3  # or however you determine this in your context
 
-      monthwise_clusters = self.df.groupby(['month', 'cluster']).size().unstack().fillna(0)
-      monthwise_total = monthwise_clusters.sum(axis=1)
-      monthwise_percentage = (monthwise_clusters.divide(monthwise_total, axis=0) * 100).round(2).astype(str) + '%'
+    monthwise_clusters = self.df.groupby(['month', 'cluster']).size().unstack().fillna(0)
+    monthwise_total = monthwise_clusters.sum(axis=1)
+    monthwise_percentage = (monthwise_clusters.divide(monthwise_total, axis=0) * 100).round(2).astype(str) + '%'
 
-      fig_monthwise = go.Figure()
-      for i in range(optimal_clusters):
-          y_cumulative = monthwise_clusters.iloc[:, :i].sum(axis=1)
-          fig_monthwise.add_trace(
-              go.Bar(
-                  x=monthwise_clusters.index,
-                  y=monthwise_clusters[i],
-                  name=f'Cluster {i}',
-                  marker_color=cluster_colors[i],
-                  text=monthwise_percentage[i],
-                  textposition='inside',
-                  insidetextanchor='middle',
-              )
-          )
-      fig_monthwise.update_layout(title='Monthwise Distribution of Clusters', xaxis_title='Month', yaxis_title='Count')
-      fig_monthwise.show()
+    fig_monthwise = go.Figure()
+    for i in range(optimal_clusters):
+        y_cumulative = monthwise_clusters.iloc[:, :i].sum(axis=1)
+        fig_monthwise.add_trace(
+            go.Bar(
+                x=monthwise_clusters.index,
+                y=monthwise_clusters[i],
+                name=f'Cluster {i}',
+                marker_color=cluster_colors[i],
+                text=monthwise_percentage[i],
+                textposition='inside',
+                insidetextanchor='middle',
+            )
+        )
+    fig_monthwise.update_layout(title='Monthwise Distribution of Clusters', xaxis_title='Month', yaxis_title='Count')
+    fig_monthwise.show()
 
   def plot_weekday_vs_weekend_monthly_averages(self) -> None:
-      """Plot the average trading volumes for weekdays vs weekends for each month with percentage annotations."""
+    """Plot the average trading volumes for weekdays vs weekends for each month with percentage annotations."""
 
-      # Determine if it's a weekend
-      self.df['is_weekend'] = self.df['day_name'].isin(['Saturday', 'Sunday'])
+    # Determine if it's a weekend
+    self.df['is_weekend'] = self.df['day_name'].isin(['Saturday', 'Sunday'])
 
-      # Calculate monthly total trading volume for weekdays and weekends
-      monthly_totals = self.df.groupby(['month', 'is_weekend'])['volume'].sum().reset_index()
+    # Calculate monthly total trading volume for weekdays and weekends
+    monthly_totals = self.df.groupby(['month', 'is_weekend'])['volume'].sum().reset_index()
 
-      # Calculate total days in each month
-      monthly_days = self.df.groupby('month').size().reset_index(name='days')
+    # Calculate total days in each month
+    monthly_days = self.df.groupby('month').size().reset_index(name='days')
 
-      # Merge totals with days
-      monthly_totals = monthly_totals.merge(monthly_days, on=['month'])
+    # Merge totals with days
+    monthly_totals = monthly_totals.merge(monthly_days, on=['month'])
 
-      # Calculate monthly average trading volume for weekdays and weekends based on total days
-      monthly_totals['average_volume'] = monthly_totals['volume'] / monthly_totals['days']
+    # Calculate monthly average trading volume for weekdays and weekends based on total days
+    monthly_totals['average_volume'] = monthly_totals['volume'] / monthly_totals['days']
 
-      # Add month names
-      month_order = ['January', 'February', 'March', 'April', 'May', 'June',
-                    'July', 'August', 'September', 'October', 'November', 'December']
-      month_name_map = dict(enumerate(month_order, 1))
-      monthly_totals['month_name'] = monthly_totals['month'].map(month_name_map)
+    # Add month names
+    month_order = ['January', 'February', 'March', 'April', 'May', 'June',
+                  'July', 'August', 'September', 'October', 'November', 'December']
+    month_name_map = dict(enumerate(month_order, 1))
+    monthly_totals['month_name'] = monthly_totals['month'].map(month_name_map)
 
-      # Calculate percentage values
-      total_volumes = monthly_totals.groupby('month_name')['average_volume'].sum()
-      monthly_totals['percentage'] = monthly_totals.apply(lambda row: (row['average_volume'] / total_volumes[row['month_name']]) * 100, axis=1)
-      monthly_totals['text'] = monthly_totals['percentage'].round(2).astype(str) + '%'
+    # Calculate percentage values
+    total_volumes = monthly_totals.groupby('month_name')['average_volume'].sum()
+    monthly_totals['percentage'] = monthly_totals.apply(lambda row: (row['average_volume'] / total_volumes[row['month_name']]) * 100, axis=1)
+    monthly_totals['text'] = monthly_totals['percentage'].round(2).astype(str) + '%'
 
-      # Visualize the averages
-      fig = px.bar(monthly_totals,
-                  x='month_name',
-                  y='average_volume',
-                  color='is_weekend',
-                  title='Average Trading Volume by Month (Weekday vs Weekend)',
-                  labels={'is_weekend': 'Is Weekend?', 'average_volume': 'Average Volume'},
-                  text='text'  # Add the percentage values
-                  )
-      fig.update_xaxes(categoryorder='array', categoryarray=month_order)
-      fig.update_traces(textposition='inside')
-      fig.show()
+    # Visualize the averages
+    fig = px.bar(monthly_totals,
+                x='month_name',
+                y='average_volume',
+                color='is_weekend',
+                title='Average Trading Volume by Month (Weekday vs Weekend)',
+                labels={'is_weekend': 'Is Weekend?', 'average_volume': 'Average Volume'},
+                text='text'  # Add the percentage values
+                )
+    fig.update_xaxes(categoryorder='array', categoryarray=month_order)
+    fig.update_traces(textposition='inside')
+    fig.show()
 
 
 
@@ -485,22 +522,26 @@ class DataValidator:
         logging.info("Data validation passed!")
         return True
 
-
 if __name__ == "__main__":
 
-  ENDPOINT = "https://www.coingecko.com/exchanges/968/usd/1_year.json?locale=en"
-  DataExtractor = DataExtractor()
-  raw_data = DataExtractor.get_raw_data_from_coingecko(ENDPOINT)
+    ENDPOINT = "https://www.coingecko.com/exchanges/968/usd/1_year.json?locale=en"
+    data_extractor = DataExtractor()
+    raw_data = data_extractor.get_raw_data_from_coingecko(ENDPOINT)
 
-  data_validator = DataValidator(raw_data)
-  if not data_validator.validate():
-      raise ValueError("Data validation failed! Check logs for more details.")
-  else:
+    # I'm assuming your DataValidator class checks the validity of the extracted raw data.
+    data_validator = DataValidator(raw_data)
+    if not data_validator.validate():
+        raise ValueError("Data validation failed! Check logs for more details.")
+    else:
+        transformer = DataTransformer(raw_data)
+        transformed_data = transformer.transform()
 
-    transformed_data = DataTransformer(raw_data).transform()
-    loader = DataLoader(transformed_data).save_to_csv("raw_data.csv")
+        # Save transformed data to CSV
+        DataLoader(transformed_data).save_to_csv("raw_data.csv")
 
-    analyzer = DataAnalyzer()
-    analyzer.perform_eda(transformed_data)
-    analyzer.perform_regression(analyzer.df)
-    analyzed_data = DataLoader(analyzer.df).save_to_csv("analyzed_data.csv")
+        # If you have a DataAnalyzer class for further analysis, you can use it here:
+        # (This assumes the DataAnalyzer class performs exploratory data analysis and regression analysis)
+        analyzer = DataAnalyzer()
+        analyzer.perform_eda(transformed_data)
+        analyzer.perform_regression(analyzer.df)
+        DataLoader(analyzer.df).save_to_csv("analyzed_data.csv")
