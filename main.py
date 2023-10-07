@@ -1,10 +1,11 @@
 from __future__ import annotations
-from typing import Tuple
+from typing import Tuple, List
 from scipy.stats import pearsonr
 import statsmodels.api as sm
 import pandas as pd
 import yfinance as yf
 import numpy as np
+import json
 import requests
 import logging
 import plotly.express as px
@@ -27,7 +28,7 @@ class DataExtractor:
     self.raw_data = None
 
 
-  def get_raw_data_from_coingecko(self, endpoint: str) -> pd.DataFrame:
+  def get_raw_data_from_coingecko(self, endpoint: str) -> List[List[Union[int, str]]]:
     # API data with timestamps and volumes
     self.endpoint = endpoint
 
@@ -41,7 +42,12 @@ class DataExtractor:
     self.raw_data = raw_data
     return self.raw_data
 
+  def get_manual_from_coingecko_as_json(self, json_file: str) -> List[List[Union[int, str]]]:
+    with open (json_file, "r") as file:
+      data = json.load(file)["volumes"]
 
+    self.raw_data = data
+    return self.raw_data
 
 class DataTransformer:
   def __init__(self, data: pd.DataFrame):
@@ -526,9 +532,10 @@ if __name__ == "__main__":
 
     ENDPOINT = "https://www.coingecko.com/exchanges/968/usd/1_year.json?locale=en"
     data_extractor = DataExtractor()
-    raw_data = data_extractor.get_raw_data_from_coingecko(ENDPOINT)
+    # raw_data = data_extractor.get_raw_data_from_coingecko(ENDPOINT)
+    raw_data = data_extractor.get_manual_from_coingecko_as_json("response.json")
+    print(raw_data)
 
-    # I'm assuming your DataValidator class checks the validity of the extracted raw data.
     data_validator = DataValidator(raw_data)
     if not data_validator.validate():
         raise ValueError("Data validation failed! Check logs for more details.")
@@ -536,11 +543,7 @@ if __name__ == "__main__":
         transformer = DataTransformer(raw_data)
         transformed_data = transformer.transform()
 
-        # Save transformed data to CSV
         DataLoader(transformed_data).save_to_csv("raw_data.csv")
-
-        # If you have a DataAnalyzer class for further analysis, you can use it here:
-        # (This assumes the DataAnalyzer class performs exploratory data analysis and regression analysis)
         analyzer = DataAnalyzer()
         analyzer.perform_eda(transformed_data)
         analyzer.perform_regression(analyzer.df)
