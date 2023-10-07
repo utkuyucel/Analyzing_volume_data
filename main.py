@@ -202,6 +202,33 @@ class DataAnalyzer:
 
     fig.show()
 
+  def perform_regression_on_vix(self,data: pd.DataFrame):
+    """
+    Perform a simple linear regression with BTC Price as the independent variable
+    and Volume as the dependent variable, and visualize the result.
+    """
+    Y = data['volume']
+    X = data['vix_close']
+    X = sm.add_constant(X)  # Adding a constant term for intercept
+
+    # Fitting the regression model
+    model = sm.OLS(Y, X).fit()
+
+    # Predicted values
+    data['predicted_vix'] = model.predict(X)
+
+    # Calculating the Pearson correlation coefficient and p-value
+    corr_coef, p_value = pearsonr(data['vix_close'], data['volume'])
+
+    # Plotting
+    title_text = (f'Vix vs Volume<br>'
+                  f'Correlation: {corr_coef:.2f}, p-value: {p_value:.4f}')
+
+    fig = px.scatter(data, x='vix_close', y='volume', title=title_text)
+    fig.add_scatter(x=data['vix_close'], y=data['predicted_vix'], mode='lines', name='Regression Line')
+
+    fig.show()
+
 
   def plot_data(self, title: str) -> None:
     """
@@ -541,4 +568,5 @@ if __name__ == "__main__":
         analyzer = DataAnalyzer()
         analyzer.perform_eda(transformed_data)
         analyzer.perform_regression(analyzer.df)
+        analyzer.perform_regression_on_vix(analyzer.df)
         DataLoader(analyzer.df).save_to_csv("analyzed_data.csv")
