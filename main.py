@@ -56,6 +56,7 @@ class DataTransformer:
     self.btc_data = None
     self.start_date = None
     self.start_date = None
+    self.vix_data = None
 
 
   def _get_btc_data(self):
@@ -69,33 +70,25 @@ class DataTransformer:
     return historical_data[["date", "btc_price"]]
 
   def _get_vix_data(self):
-    self.start_date = self.df["date"].min()
-    self.end_date = self.df["date"].max()
-
+    # 1. Fetch VIX data for the desired time range.
     ticker = yf.Ticker("^VIX")
-    historical_data = ticker.history(start=self.start_date, end=self.end_date).reset_index()
-    historical_data.rename(columns={"Date": "date", "Close": "vix"}, inplace=True)
-    historical_data['date'] = historical_data['date'].dt.tz_localize(None)
+    vix_data = ticker.history(start=self.start_date, end=self.end_date).reset_index()
+    vix_data.rename(columns={"Date": "date", "Close": "vix_close"}, inplace=True)
+    vix_data['date'] = vix_data['date'].dt.tz_localize(None)
+    
+    # Create a DataFrame with all dates including weekends
+    all_dates_df = pd.DataFrame({
+        'date': pd.date_range(start=self.start_date, end=self.end_date)
+    })
 
-    # Create a date range from start_date to end_date
-    full_date_range = pd.date_range(start=self.start_date, end=self.end_date)
-
-    # Identify missing dates
-    missing_dates = full_date_range.difference(historical_data['date'])
-
-    # Calculate weekly averages
-    historical_data.set_index('date', inplace=True)
-    weekly_avg = historical_data.resample('W-SUN').mean()
-
-    # Fill missing weekend dates with previous week's average
-    for missing_date in missing_dates:
-        if missing_date.weekday() >= 5:  # If Saturday or Sunday
-            prev_sunday = missing_date - pd.Timedelta(days=(missing_date.weekday() - 6))
-            historical_data.loc[missing_date] = weekly_avg.loc[prev_sunday]
-
-    historical_data.reset_index(inplace=True)
-
-    return historical_data[["date", "vix"]]
+    # Left merge to ensure all dates are present
+    vix_data = pd.merge(all_dates_df, vix_data, on='date', how='left')
+    
+    # Backward fill for missing values
+    vix_data['vix_close'].fillna(method='ffill', inplace=True)
+    vix_data['vix_close'].fillna(method='bfill', inplace=True)
+    
+    return vix_data[["date", "vix_close"]]
 
 
   def transform_timestamps_from_coingecko(self):
@@ -159,14 +152,15 @@ class DataTransformer:
     self.transform_dataframe_from_coingecko()
     self.detect_outliers()
 
-    # self.df['date'] = pd.to_datetime(self.df['date'])
-
     self.btc_data = self._get_btc_data()
-    # Merge BTC and Df
-    self.merged_data = pd.merge(self.df, self.btc_data, on = "date", how = "inner")
+    self.vix_data = self._get_vix_data()  # Fetch VIX data
 
+    # Merge BTC, VIX, and Df
+    self.merged_data = pd.merge(self.df, self.btc_data, on="date", how="inner")
+    self.merged_data = pd.merge(self.merged_data, self.vix_data, on="date", how="left")  # Merge with VIX
 
     return self.merged_data
+
 
 class DataLoader:
   def __init__(self, data : pd.DataFrame):
