@@ -26,6 +26,7 @@ logging.basicConfig(filename = "pipeline.log", level=logging.INFO, format="%(asc
 class DataExtractor:
   def __init__(self):
     self.raw_data = None
+    self.android_data = None
 
 
   def get_raw_data_from_coingecko(self, endpoint: str) -> List[List[Union[int, str]]]:
@@ -57,7 +58,7 @@ class DataTransformer:
     self.start_date = None
     self.start_date = None
     self.vix_data = None
-
+    self.android_data = None
 
   def _get_btc_data(self):
     self.start_date = self.df["date"].min()
@@ -75,7 +76,7 @@ class DataTransformer:
     vix_data = ticker.history(start=self.start_date, end=self.end_date).reset_index()
     vix_data.rename(columns={"Date": "date", "Close": "vix_close"}, inplace=True)
     vix_data['date'] = vix_data['date'].dt.tz_localize(None)
-    
+
     # Create a DataFrame with all dates including weekends
     all_dates_df = pd.DataFrame({
         'date': pd.date_range(start=self.start_date, end=self.end_date)
@@ -83,12 +84,19 @@ class DataTransformer:
 
     # Left merge to ensure all dates are present
     vix_data = pd.merge(all_dates_df, vix_data, on='date', how='left')
-    
+
     # Backward fill for missing values
     vix_data['vix_close'].fillna(method='ffill', inplace=True)
     vix_data['vix_close'].fillna(method='bfill', inplace=True)
-    
+
     return vix_data[["date", "vix_close"]]
+
+  
+  def _get_android_data_from_csv(self, filename: str) -> pd.DataFrame:
+    df_android = pd.read_csv(filename)
+    self.android_data = df_android[["date", "users"]]
+    self.android_data['date'] = pd.to_datetime(self.android_data['date'])
+    return self.android_data
 
 
   def transform_timestamps_from_coingecko(self):
@@ -154,10 +162,12 @@ class DataTransformer:
 
     self.btc_data = self._get_btc_data()
     self.vix_data = self._get_vix_data()  # Fetch VIX data
+    self.android_data = self._get_android_data_from_csv("bitlo_android_modified.csv")  
 
-    # Merge BTC, VIX, and Df
+    # Merge BTC, VIX, and Other datasets
     self.merged_data = pd.merge(self.df, self.btc_data, on="date", how="inner")
     self.merged_data = pd.merge(self.merged_data, self.vix_data, on="date", how="left")  # Merge with VIX
+    self.merged_data = pd.merge(self.merged_data, self.android_data, on = "date", how = "inner")
 
     return self.merged_data
 
@@ -175,7 +185,7 @@ class DataAnalyzer:
     self.df = None
 
 
-  def perform_regression(self,data: pd.DataFrame):
+  def perform_regression_on_volume(self,data: pd.DataFrame):
     """
     Perform a simple linear regression with BTC Price as the independent variable
     and Volume as the dependent variable, and visualize the result.
@@ -204,7 +214,7 @@ class DataAnalyzer:
 
   def perform_regression_on_vix(self,data: pd.DataFrame):
     """
-    Perform a simple linear regression with BTC Price as the independent variable
+    Perform a simple linear regression with VIX price as the independent variable
     and Volume as the dependent variable, and visualize the result.
     """
     Y = data['volume']
@@ -226,6 +236,33 @@ class DataAnalyzer:
 
     fig = px.scatter(data, x='vix_close', y='volume', title=title_text)
     fig.add_scatter(x=data['vix_close'], y=data['predicted_vix'], mode='lines', name='Regression Line')
+
+    fig.show()
+
+  def perform_regression_on_android(self,data: pd.DataFrame):
+    """
+    Perform a simple linear regression with Android Downloads as the independent variable
+    and Volume as the dependent variable, and visualize the result.
+    """
+    Y = data['volume']
+    X = data['users']
+    X = sm.add_constant(X)  # Adding a constant term for intercept
+
+    # Fitting the regression model
+    model = sm.OLS(Y, X).fit()
+
+    # Predicted values
+    data['predicted_users'] = model.predict(X)
+
+    # Calculating the Pearson correlation coefficient and p-value
+    corr_coef, p_value = pearsonr(data['users'], data['volume'])
+
+    # Plotting
+    title_text = (f'Android users vs Volume<br>'
+                  f'Correlation: {corr_coef:.2f}, p-value: {p_value:.4f}')
+
+    fig = px.scatter(data, x='users', y='volume', title=title_text)
+    fig.add_scatter(x=data['users'], y=data['predicted_users'], mode='lines', name='Regression Line')
 
     fig.show()
 
@@ -553,8 +590,8 @@ if __name__ == "__main__":
 
     ENDPOINT = "https://www.coingecko.com/exchanges/968/usd/1_year.json?locale=en"
     data_extractor = DataExtractor()
-    # raw_data = data_extractor.get_raw_data_from_coingecko(ENDPOINT)
-    raw_data = data_extractor.get_manual_from_coingecko_as_json("response.json")
+    raw_data = data_extractor.get_raw_data_from_coingecko(ENDPOINT)
+    # raw_data = data_extractor.get_manual_from_coingecko_as_json("response.json")
     print(raw_data)
 
     data_validator = DataValidator(raw_data)
@@ -567,6 +604,7 @@ if __name__ == "__main__":
         DataLoader(transformed_data).save_to_csv("raw_data.csv")
         analyzer = DataAnalyzer()
         analyzer.perform_eda(transformed_data)
-        analyzer.perform_regression(analyzer.df)
+        analyzer.perform_regression_on_volume(analyzer.df)
         analyzer.perform_regression_on_vix(analyzer.df)
+        analyzer.perform_regression_on_android(analyzer.df)
         DataLoader(analyzer.df).save_to_csv("analyzed_data.csv")
