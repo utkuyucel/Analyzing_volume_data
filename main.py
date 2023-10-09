@@ -26,7 +26,6 @@ logging.basicConfig(filename = "pipeline.log", level=logging.INFO, format="%(asc
 class DataExtractor:
   def __init__(self):
     self.raw_data = None
-    self.android_data = None
 
 
   def get_raw_data_from_coingecko(self, endpoint: str) -> List[List[Union[int, str]]]:
@@ -59,6 +58,7 @@ class DataTransformer:
     self.start_date = None
     self.vix_data = None
     self.android_data = None
+    self.ios_data = None
 
   def _get_btc_data(self):
     self.start_date = self.df["date"].min()
@@ -97,6 +97,13 @@ class DataTransformer:
     self.android_data = df_android[["date", "users"]]
     self.android_data['date'] = pd.to_datetime(self.android_data['date'])
     return self.android_data
+
+  def _get_ios_data_from_csv(self, filename: str) -> pd.DataFrame:
+    df_ios = pd.read_csv(filename)
+    self.ios_data = df_ios[["date", "users"]]
+    self.ios_data['date'] = pd.to_datetime(self.ios_data['date'])
+    self.ios_data.rename(columns = {"users": "ios_users"}, inplace = True)
+    return self.ios_data
 
 
   def transform_timestamps_from_coingecko(self):
@@ -163,11 +170,13 @@ class DataTransformer:
     self.btc_data = self._get_btc_data()
     self.vix_data = self._get_vix_data()  # Fetch VIX data
     self.android_data = self._get_android_data_from_csv("bitlo_android_modified.csv")  
+    self.ios_data = self._get_ios_data_from_csv("bitlo_ios_modified.csv")
 
     # Merge BTC, VIX, and Other datasets
     self.merged_data = pd.merge(self.df, self.btc_data, on="date", how="inner")
     self.merged_data = pd.merge(self.merged_data, self.vix_data, on="date", how="left")  # Merge with VIX
     self.merged_data = pd.merge(self.merged_data, self.android_data, on = "date", how = "inner")
+    self.merged_data = pd.merge(self.merged_data, self.ios_data, on = "date", how = "inner")
 
     return self.merged_data
 
@@ -266,6 +275,32 @@ class DataAnalyzer:
 
     fig.show()
 
+  def perform_regression_on_ios(self,data: pd.DataFrame):
+    """
+    Perform a simple linear regression with IOS Downloads as the independent variable
+    and Volume as the dependent variable, and visualize the result.
+    """
+    Y = data['volume']
+    X = data['ios_users']
+    X = sm.add_constant(X)  # Adding a constant term for intercept
+
+    # Fitting the regression model
+    model = sm.OLS(Y, X).fit()
+
+    # Predicted values
+    data['predicted_ios_users'] = model.predict(X)
+
+    # Calculating the Pearson correlation coefficient and p-value
+    corr_coef, p_value = pearsonr(data['ios_users'], data['volume'])
+
+    # Plotting
+    title_text = (f'IOS users vs Volume<br>'
+                  f'Correlation: {corr_coef:.2f}, p-value: {p_value:.4f}')
+
+    fig = px.scatter(data, x='ios_users', y='volume', title=title_text)
+    fig.add_scatter(x=data['ios_users'], y=data['predicted_ios_users'], mode='lines', name='Regression Line')
+
+    fig.show()
 
   def plot_data(self, title: str) -> None:
     """
@@ -590,8 +625,8 @@ if __name__ == "__main__":
 
     ENDPOINT = "https://www.coingecko.com/exchanges/968/usd/1_year.json?locale=en"
     data_extractor = DataExtractor()
-    raw_data = data_extractor.get_raw_data_from_coingecko(ENDPOINT)
-    # raw_data = data_extractor.get_manual_from_coingecko_as_json("response.json")
+    # raw_data = data_extractor.get_raw_data_from_coingecko(ENDPOINT)
+    raw_data = data_extractor.get_manual_from_coingecko_as_json("response.json")
     print(raw_data)
 
     data_validator = DataValidator(raw_data)
@@ -607,4 +642,5 @@ if __name__ == "__main__":
         analyzer.perform_regression_on_volume(analyzer.df)
         analyzer.perform_regression_on_vix(analyzer.df)
         analyzer.perform_regression_on_android(analyzer.df)
+        analyzer.perform_regression_on_ios(analyzer.df)
         DataLoader(analyzer.df).save_to_csv("analyzed_data.csv")
