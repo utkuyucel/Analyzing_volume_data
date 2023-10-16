@@ -94,15 +94,17 @@ class DataTransformer:
   
   def _get_android_data_from_csv(self, filename: str) -> pd.DataFrame:
     df_android = pd.read_csv(filename)
+    df_android['date'] = pd.to_datetime(df_android['date'])
+    df_android = self._remove_outliers_from_mobile_data(df_android, 'users')
     self.android_data = df_android[["date", "users"]]
-    self.android_data['date'] = pd.to_datetime(self.android_data['date'])
     return self.android_data
 
   def _get_ios_data_from_csv(self, filename: str) -> pd.DataFrame:
     df_ios = pd.read_csv(filename)
-    self.ios_data = df_ios[["date", "users"]]
-    self.ios_data['date'] = pd.to_datetime(self.ios_data['date'])
-    self.ios_data.rename(columns = {"users": "ios_users"}, inplace = True)
+    df_ios['date'] = pd.to_datetime(df_ios['date'])
+    df_ios.rename(columns = {"users": "ios_users"}, inplace = True)
+    df_ios = self._remove_outliers_from_mobile_data(df_ios, 'ios_users')
+    self.ios_data = df_ios[["date", "ios_users"]]
     return self.ios_data
 
 
@@ -160,6 +162,27 @@ class DataTransformer:
     self.df = self.df[~outliers]
     logging.info(f"Identified and removed {len(self.outliers)} outliers.")
 
+  
+  def _remove_outliers_from_mobile_data(self, data: pd.DataFrame, column: str) -> pd.DataFrame:
+    df_prophet = data[['date', column]]
+    df_prophet.columns = ['ds', 'y']
+
+    model = Prophet(yearly_seasonality=False, daily_seasonality=False)
+    model.add_seasonality(name='monthly', period=30.5, fourier_order=5)
+    model.fit(df_prophet)
+
+    forecast = model.predict(df_prophet)
+
+    residuals = data[column] - forecast['yhat']
+    threshold = 3 * residuals.std()
+    outliers = (residuals.abs() > threshold).values
+
+    data = data[~outliers]
+    logging.info(f"Identified and removed outliers from {column}.")
+
+    return data
+
+
 
 
   def transform(self) -> None:
@@ -178,6 +201,11 @@ class DataTransformer:
     self.merged_data = pd.merge(self.merged_data, self.android_data, on = "date", how = "inner")
     self.merged_data = pd.merge(self.merged_data, self.ios_data, on = "date", how = "inner")
 
+    print("----------------------------------------------------------")
+
+    print(self.merged_data)
+
+    print("----------------------------------------------------------")
     return self.merged_data
 
 
@@ -625,8 +653,8 @@ if __name__ == "__main__":
 
     ENDPOINT = "https://www.coingecko.com/exchanges/968/usd/1_year.json?locale=en"
     data_extractor = DataExtractor()
-    # raw_data = data_extractor.get_raw_data_from_coingecko(ENDPOINT)
-    raw_data = data_extractor.get_manual_from_coingecko_as_json("response.json")
+    raw_data = data_extractor.get_raw_data_from_coingecko(ENDPOINT)
+    # raw_data = data_extractor.get_manual_from_coingecko_as_json("response.json")
     print(raw_data)
 
     data_validator = DataValidator(raw_data)
