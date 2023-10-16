@@ -201,11 +201,6 @@ class DataTransformer:
     self.merged_data = pd.merge(self.merged_data, self.android_data, on = "date", how = "inner")
     self.merged_data = pd.merge(self.merged_data, self.ios_data, on = "date", how = "inner")
 
-    print("----------------------------------------------------------")
-
-    print(self.merged_data)
-
-    print("----------------------------------------------------------")
     return self.merged_data
 
 
@@ -655,7 +650,6 @@ if __name__ == "__main__":
     data_extractor = DataExtractor()
     raw_data = data_extractor.get_raw_data_from_coingecko(ENDPOINT)
     # raw_data = data_extractor.get_manual_from_coingecko_as_json("response.json")
-    print(raw_data)
 
     data_validator = DataValidator(raw_data)
     if not data_validator.validate():
