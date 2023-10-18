@@ -172,16 +172,21 @@ class DataTransformer:
     """Aggregate the daily volume data to monthly data."""
     monthly_df = self.df.groupby(self.df['date'].dt.to_period("M")).agg({'volume': 'sum'}).reset_index()
     monthly_df['date'] = monthly_df['date'].dt.to_timestamp()  # Convert period back to datetime
-    print(monthly_df)
     return monthly_df
 
   def merge_with_ga_data(self) -> pd.DataFrame:
-      """Merge the aggregated monthly data with Google Analytics data."""
-      monthly_data = self.aggregate_monthly_volume()
-      merged_ga_data = pd.merge(monthly_data, self.google_analytics_data, on="date", how="inner")
-      self.google_analytics_data = merged_ga_data
-      return self.google_analytics_data
+    """Merge the aggregated monthly data with Google Analytics data."""
+    monthly_data = self.aggregate_monthly_volume()
+    merged_ga_data = pd.merge(monthly_data, self.google_analytics_data, on="date", how="inner")
+    self.google_analytics_data = merged_ga_data
+    return self.google_analytics_data
 
+  def merge_with_sw_data(self) -> pd.DataFrame:
+    """Merge the aggregated monthly data with Similarweb data."""
+    monthly_data = self.aggregate_monthly_volume()
+    merged_sw_data = pd.merge(monthly_data, self.similarweb_data, on="date", how="inner")
+    self.similarweb_data = merged_sw_data
+    return self.similarweb_data
 
   def transform(self) -> pd.DataFrame:
     self.transform_timestamps_from_coingecko()
@@ -194,11 +199,9 @@ class DataTransformer:
     self.google_analytics_data = self.transform_google_analytics_data(self.google_analytics_data)
     self.merge_with_ga_data()  # Calling the merge function
 
-    print(self.google_analytics_data)
-
-    # self.similarweb_data = DataExtractor().get_manual_from_similarweb("bitlo_similarweb.csv")
-    # self.similarweb_data = self.transform_similarweb_data(self.similarweb_data)
-    # self.similarweb_data = pd.merge(self.similarweb_data, self.df, on = "date", how = "inner")
+    self.similarweb_data = DataExtractor().get_manual_from_similarweb("bitlo_similarweb.csv")
+    self.similarweb_data = self.transform_similarweb_data(self.similarweb_data)
+    self.merge_with_sw_data()
 
     self.merged_data = pd.merge(self.df, self.btc_data, on="date", how="inner")
     return self.merged_data
@@ -288,7 +291,7 @@ class DataAnalyzer:
     corr_coef, p_value = pearsonr(data['view_count'], data['volume'])
 
     # Plotting
-    title_text = (f'View Count vs Volume<br>'
+    title_text = (f'GA Visitors vs Volume<br>'
                   f'Correlation: {corr_coef:.2f}, p-value: {p_value:.4f}')
 
     fig = px.scatter(data, x='view_count', y='volume', title=title_text)
@@ -311,5 +314,5 @@ if __name__ == "__main__":
     analyzer = DataAnalyzer()
     analyzer.perform_regression_on_volume(transformed_data)
     analyzer.perform_regression_on_ga_data(transformer.google_analytics_data)
-    # analyzer.perform_regression_on_similarweb_data(transformer.similarweb_data)
+    analyzer.perform_regression_on_similarweb_data(transformer.similarweb_data)
     DataLoader(transformed_data).save_to_csv("analyzed_data.csv") # Saving transformed & analyzed data
