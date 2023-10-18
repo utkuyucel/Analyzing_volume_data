@@ -185,7 +185,7 @@ class DataTransformer:
 
 
 
-  def transform(self) -> None:
+  def transform(self) -> pd.DataFrame:
     self.transform_timestamps_from_coingecko()
     self.transform_dataframe_from_coingecko()
     self.detect_outliers()
