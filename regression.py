@@ -59,6 +59,11 @@ class DataExtractor:
     df = pd.read_csv(file_name)
     return df
 
+  
+  def get_manual_monthly_new_users(self, file_name: str) -> pd.DataFrame:
+    df = pd.read_csv(file_name, usecols = ["date", "total_new_user"])
+    return df
+
 class DataTransformer:
   def __init__(self, data: pd.DataFrame):
     self.df = data
@@ -68,6 +73,7 @@ class DataTransformer:
     self.ios_data = None
     self.google_analytics_data = None
     self.similarweb_data = None
+    self.monthly_new_users = None
 
   # TODO: Will be added to "DataExtractor" class in Future
   def _get_btc_data(self):
@@ -91,10 +97,20 @@ class DataTransformer:
 
   def transform_similarweb_data(self, data: pd.DataFrame) -> pd.DataFrame:
     data["date"] = pd.to_datetime(data["date"], format= "%d-%m-%Y")
-    data["similarweb_count"] = data["similarweb_count"].replace(regex = "\\,", value = ".").astype(float)
+    # data["similarweb_count"] = data["similarweb_count"].replace(regex = "\\,", value = ".").astype(float)
+    data["similarweb_count"] = data["similarweb_count"].astype(int)
 
     self.similarweb_data = data
     return self.similarweb_data
+
+  def transform_monthly_new_users_data(self, data: pd.DataFrame) -> pd.DataFrame:
+    data = data.dropna(how = "any")
+    data["date"] = pd.to_datetime(data["date"], format= "%Y-%m-%d")
+    data["total_new_user"] = data["total_new_user"].astype(int)
+    data = self._remove_outliers_from_given_data(data, "total_new_user")
+
+    self.monthly_new_users = data
+    return self.monthly_new_users
 
   def transform_timestamps_from_coingecko(self):
     # Transforming timestamps into dates
@@ -149,7 +165,7 @@ class DataTransformer:
     logging.info(f"Identified and removed {len(self.outliers)} outliers.")
 
 
-  def _remove_outliers_from_mobile_data(self, data: pd.DataFrame, column: str) -> pd.DataFrame:
+  def _remove_outliers_from_given_data(self, data: pd.DataFrame, column: str) -> pd.DataFrame:
     df_prophet = data[['date', column]]
     df_prophet.columns = ['ds', 'y']
 
@@ -160,7 +176,7 @@ class DataTransformer:
     forecast = model.predict(df_prophet)
 
     residuals = data[column] - forecast['yhat']
-    threshold = 3 * residuals.std()
+    threshold = 2 * residuals.std()
     outliers = (residuals.abs() > threshold).values
 
     data = data[~outliers]
@@ -188,6 +204,13 @@ class DataTransformer:
     self.similarweb_data = merged_sw_data
     return self.similarweb_data
 
+  def merge_with_new_users_data(self) -> pd.DataFrame:
+    """Merge the aggregated monthly data with Monthly New users data."""
+    monthly_data = self.aggregate_monthly_volume()
+    merged_mt_data = pd.merge(monthly_data, self.monthly_new_users, on="date", how="inner")
+    self.monthly_new_users = merged_mt_data
+    return self.monthly_new_users
+
   def transform(self) -> pd.DataFrame:
     self.transform_timestamps_from_coingecko()
     self.transform_dataframe_from_coingecko()
@@ -202,6 +225,10 @@ class DataTransformer:
     self.similarweb_data = DataExtractor().get_manual_from_similarweb("bitlo_similarweb.csv")
     self.similarweb_data = self.transform_similarweb_data(self.similarweb_data)
     self.merge_with_sw_data()
+    
+    self.monthly_new_users = DataExtractor().get_manual_monthly_new_users("monthly_new_users.csv")
+    self.monthly_new_users = self.transform_monthly_new_users_data(self.monthly_new_users)
+    self.merge_with_new_users_data()
 
     self.merged_data = pd.merge(self.df, self.btc_data, on="date", how="inner")
     return self.merged_data
@@ -265,7 +292,7 @@ class DataAnalyzer:
     corr_coef, p_value = pearsonr(data['similarweb_count'], data['volume'])
 
     # Plotting
-    title_text = (f'similarweb_count vs Volume<br>'
+    title_text = (f'Similarweb Visitors vs Volume<br>'
                   f'Correlation: {corr_coef:.2f}, p-value: {p_value:.4f}')
 
     fig = px.scatter(data, x='similarweb_count', y='volume', title=title_text)
@@ -291,11 +318,36 @@ class DataAnalyzer:
     corr_coef, p_value = pearsonr(data['view_count'], data['volume'])
 
     # Plotting
-    title_text = (f'GA Visitors vs Volume<br>'
+    title_text = (f'Google Analytics Visitors vs Volume<br>'
                   f'Correlation: {corr_coef:.2f}, p-value: {p_value:.4f}')
 
     fig = px.scatter(data, x='view_count', y='volume', title=title_text)
     fig.add_scatter(x=data['view_count'], y=data['predicted_view_count'], mode='lines', name='Regression Line')
+
+    fig.show()
+
+  
+  def perform_regression_on_monthly_new_users_data(self,data: pd.DataFrame):
+
+    Y = data['volume']
+    X = data['total_new_user']
+    X = sm.add_constant(X)  # Adding a constant term for intercept
+
+    # Fitting the regression model
+    model = sm.OLS(Y, X).fit()
+
+    # Predicted values
+    data['predicted_total_new_user'] = model.predict(X)
+
+    # Calculating the Pearson correlation coefficient and p-value
+    corr_coef, p_value = pearsonr(data['total_new_user'], data['volume'])
+
+    # Plotting
+    title_text = (f'Monthly New Users vs Volume<br>'
+                  f'Correlation: {corr_coef:.2f}, p-value: {p_value:.4f}')
+
+    fig = px.scatter(data, x='total_new_user', y='volume', title=title_text)
+    fig.add_scatter(x=data['total_new_user'], y=data['predicted_total_new_user'], mode='lines', name='Regression Line')
 
     fig.show()
 
@@ -315,4 +367,5 @@ if __name__ == "__main__":
     analyzer.perform_regression_on_volume(transformed_data)
     analyzer.perform_regression_on_ga_data(transformer.google_analytics_data)
     analyzer.perform_regression_on_similarweb_data(transformer.similarweb_data)
+    analyzer.perform_regression_on_monthly_new_users_data(transformer.monthly_new_users)
     DataLoader(transformed_data).save_to_csv("analyzed_data.csv") # Saving transformed & analyzed data
