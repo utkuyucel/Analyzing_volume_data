@@ -443,6 +443,13 @@ class DataAnalyzer:
     self._set_month_order()
     monthly_volume = self.df.groupby('month_name')['volume'].mean().reset_index()
 
+    # Fill NaN values with 0 or another appropriate value
+    monthly_volume['volume'] = monthly_volume['volume'].fillna(0)
+
+    # Ensure no infinite values exist
+    monthly_volume.replace([np.inf, -np.inf], 0, inplace=True)
+
+    # Now safely round and convert to integer
     formatted_volume = '$' + monthly_volume['volume'].round(0).astype(int).astype(str)
 
     fig = px.bar(monthly_volume,
